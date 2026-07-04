@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora e Gestão 3D</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Gestão de Custos 3D</h1>
+        
+        <div class="card card-secundario">
+            <h2>1. Insumos Extras (LEDs, Ímãs, Caixas)</h2>
+            <p class="ajuda-texto">Cadastre materiais comprados em lote ou por metro. O sistema calculará o custo fracionado.</p>
+            <form id="form-extra">
+                <div class="form-group-inline">
+                    <div style="flex: 2;">
+                        <label for="extra-nome">Nome do Insumo:</label>
+                        <input type="text" id="extra-nome" required placeholder="Ex: Fita LED, Ímã de Neodímio">
+                    </div>
+                    <div style="flex: 1;">
+                        <label for="extra-medida">Medido em:</label>
+                        <select id="extra-medida" required>
+                            <option value="Unidades">Unidades (Peças)</option>
+                            <option value="Metros">Metros (m)</option>
+                            <option value="Centímetros">Centímetros (cm)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group-inline">
+                    <div>
+                        <label for="extra-qtd">Qtd Total Comprada:</label>
+                        <input type="number" id="extra-qtd" step="0.01" min="0.01" required placeholder="Ex: 5">
+                    </div>
+                    <div>
+                        <label for="extra-preco">Preço Total Pago (R$):</label>
+                        <input type="number" id="extra-preco" step="0.01" required placeholder="Ex: 50.00">
+                    </div>
+                </div>
+                <button type="submit" class="btn-secundario">Salvar Insumo</button>
+            </form>
+            <div id="lista-extras" class="lista-itens">
+                </div>
+        </div>
+
+        <div class="card">
+            <h2>2. Calculadora do Produto Final</h2>
+            <form id="calc-form">
+                <div class="form-group">
+                    <label for="nome-produto">Nome do Produto 3D:</label>
+                    <input type="text" id="nome-produto" required placeholder="Ex: Luminária Logo Batman">
+                </div>
+
+                <fieldset>
+                    <legend>Dados de Impressão</legend>
+                    <div class="form-group-inline">
+                        <div>
+                            <label for="peso">Peso (g):</label>
+                            <input type="number" id="peso" step="0.01" required placeholder="Ex: 150">
+                        </div>
+                        <div>
+                            <label for="preco-kg">Kg do filamento (R$):</label>
+                            <input type="number" id="preco-kg" step="0.01" required placeholder="Ex: 120.00">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group-inline">
+                        <div>
+                            <label for="horas">Tempo (Horas):</label>
+                            <input type="number" id="horas" min="0" value="0" required>
+                        </div>
+                        <div>
+                            <label for="minutos">Tempo (Minutos):</label>
+                            <input type="number" id="minutos" min="0" max="59" value="0" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group-inline">
+                        <div>
+                            <label for="consumo">Consumo (kW):</label>
+                            <input type="number" id="consumo" step="0.001" required value="0.15">
+                        </div>
+                        <div>
+                            <label for="preco-kwh">Preço kWh (R$):</label>
+                            <input type="number" id="preco-kwh" step="0.01" required value="0.95">
+                        </div>
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Adicionar Insumos a este Produto</legend>
+                    <div id="selecao-extras" class="selecao-qtd-group">
+                        <p class="ajuda-texto">Cadastre insumos no passo 1. Digite a quantidade que usou de cada um.</p>
+                        </div>
+                </fieldset>
+
+                <button type="submit">Calcular Custos (Apenas Simular)</button>
+            </form>
+        </div>
+
+        <div id="resultados" class="card resultados oculto">
+            <h2 id="res-nome-produto">Nome do Produto</h2>
+            <div class="resultado-item">
+                <span>Custo Impressão 3D (Máquina):</span>
+                <strong id="res-custo-base">R$ 0,00</strong>
+            </div>
+            <div class="resultado-item">
+                <span>Custo dos Insumos Adicionados:</span>
+                <strong id="res-custo-extras">R$ 0,00</strong>
+            </div>
+            <hr>
+            <div class="resultado-item destaque">
+                <span>CUSTO TOTAL DE PRODUÇÃO:</span>
+                <strong id="res-total">R$ 0,00</strong>
+            </div>
+            
+            <h3 style="margin-top: 1rem;">Sugestão de Preços Diretos (Sem Taxa)</h3>
+            <div class="resultado-item b2b">
+                <span>Venda B2B (M3 - 3x):</span>
+                <div>
+                    <strong id="res-markup3">R$ 0,00</strong>
+                    <div class="lucro-info" id="lucro-m3">Lucro: R$ 0,00</div>
+                </div>
+            </div>
+            <div class="resultado-item b2c">
+                <span>Venda B2C (M5 - 5x):</span>
+                <div>
+                    <strong id="res-markup5">R$ 0,00</strong>
+                    <div class="lucro-info" id="lucro-m5">Lucro: R$ 0,00</div>
+                </div>
+            </div>
+
+            <hr>
+            <h3>Preço de Venda na Shopee (Taxa 20% + R$4)</h3>
+            <div class="resultado-item shopee-m3">
+                <span>Shopee para manter M3:</span>
+                <strong id="res-shopee-m3">R$ 0,00</strong>
+            </div>
+            <div class="resultado-item shopee-m5">
+                <span>Shopee para manter M5:</span>
+                <strong id="res-shopee-m5">R$ 0,00</strong>
+            </div>
+
+            <div class="simulador-shopee">
+                <div class="form-group">
+                    <label for="simular-preco">Simular outro anúncio na Shopee (R$):</label>
+                    <input type="number" id="simular-preco" step="0.01">
+                </div>
+                <div class="resultado-item">
+                    <span>Taxa retida pela Shopee:</span>
+                    <span id="res-shopee-taxa-retida">R$ 0,00</span>
+                </div>
+                <div class="resultado-item">
+                    <span>Valor que cai na sua conta:</span>
+                    <strong id="res-shopee-liquido">R$ 0,00</strong>
+                </div>
+                <hr style="border-color: #444; margin: 0.5rem 0;">
+                <div class="resultado-item liquido-destaque">
+                    <span>SEU LUCRO REAL (Líquido - Custo):</span>
+                    <strong id="res-shopee-lucro">R$ 0,00</strong>
+                </div>
+                
+                <div id="alerta-lucro" class="alerta oculto"></div>
+            </div>
+
+            <button type="button" id="btn-salvar-historico" class="btn-sucesso">💾 Salvar este Produto no Histórico</button>
+        </div>
+
+        <div class="card card-secundario">
+            <h2>3. Produtos Salvos</h2>
+            <div id="lista-produtos" class="lista-itens">
+                </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
