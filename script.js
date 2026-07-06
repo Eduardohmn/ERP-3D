@@ -9,7 +9,7 @@ let DB = {
 };
 let simulacaoAtual = null;
 
-// --- INTEGRAÇÃO COM GITHUB GISTS (NUVEM) ---
+// --- INTEGRAÇÃO COM GITHUB GISTS ---
 let GITHUB_TOKEN = localStorage.getItem('github_token');
 let GIST_ID = localStorage.getItem('gist_id');
 
@@ -23,7 +23,6 @@ async function iniciarNuvem() {
         
         if (inputDados) {
             const tokenMatch = inputDados.match(/(ghp_[a-zA-Z0-9]+)/);
-            
             if (tokenMatch) {
                 GITHUB_TOKEN = tokenMatch[1];
                 GIST_ID = inputDados.replace(GITHUB_TOKEN, '').replace(/[^a-zA-Z0-9]/g, '').trim();
@@ -32,30 +31,24 @@ async function iniciarNuvem() {
                     localStorage.setItem('github_token', GITHUB_TOKEN);
                     localStorage.setItem('gist_id', GIST_ID);
                 } else {
-                    alert("⚠️ O Token foi encontrado, mas não conseguimos achar o ID do Gist no texto colado.\n\nIniciando no modo Offline.");
-                    iniciarApp(); 
-                    return;
+                    alert("⚠️ ID do Gist não encontrado. Iniciando offline.");
+                    iniciarApp(); return;
                 }
             } else {
-                alert("⚠️ Não conseguimos encontrar um Token válido começando com 'ghp_' no texto.\n\nIniciando no modo Offline.");
-                iniciarApp(); 
-                return;
+                alert("⚠️ Token 'ghp_' inválido. Iniciando offline.");
+                iniciarApp(); return;
             }
         } else {
-            alert("Modo offline ativado (dados não serão sincronizados). Recarregue a página para configurar a nuvem.");
-            iniciarApp(); 
-            return;
+            iniciarApp(); return;
         }
     }
 
     try {
-        document.title = "Sincronizando com a Nuvem...";
+        document.title = "Sincronizando...";
         const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
             headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
         });
-
-        if (!response.ok) throw new Error("Credenciais inválidas ou Gist não encontrado.");
-
+        if (!response.ok) throw new Error("Credenciais inválidas.");
         const data = await response.json();
         const content = data.files['database.json'].content;
         
@@ -69,35 +62,26 @@ async function iniciarNuvem() {
             DB.historicoVendas = cloudDB.historicoVendas || [];
             DB.historicoPerdas = cloudDB.historicoPerdas || []; 
         }
-
-        document.title = "Gestão 3D Pro - ERP (Nuvem ☁️)";
-        console.log("Sincronização concluída com sucesso.");
+        document.title = "Gestão 3D Pro - ERP";
         iniciarApp(); 
-        
     } catch (error) {
-        alert("Erro de Conexão com o GitHub: " + error.message + "\n\nO sistema iniciará vazio. Limpe o cache do navegador se quiser reconfigurar as chaves.");
-        document.title = "Gestão 3D Pro - ERP (Offline)";
+        alert("Erro no GitHub: " + error.message);
+        document.title = "Gestão 3D (Offline)";
         iniciarApp();
     }
 }
 
 async function salvarDB() {
     localStorage.setItem('db_backup', JSON.stringify(DB));
-
     if (GITHUB_TOKEN && GIST_ID) {
         try {
-            const btnOriginal = document.title;
-            document.title = "Salvando na Nuvem...";
-            
             await fetch(`https://api.github.com/gists/${GIST_ID}`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ files: { 'database.json': { content: JSON.stringify(DB) } } })
             });
-            document.title = btnOriginal;
         } catch (e) {
-            console.error("Falha ao salvar na nuvem:", e);
-            alert("⚠️ Falha ao enviar para o GitHub. Salvo apenas no cache local.");
+            console.error("Falha nuvem:", e);
         }
     }
 }
@@ -112,7 +96,8 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.getElementById(tabId).classList.add('active');
         e.target.classList.add('active');
         
-        if(tabId === 'tab-calc') { atualizarSelectsDinamicos(); atualizarSelectProducao(); }
+        if(tabId === 'tab-calc') { atualizarSelectsDinamicos(); }
+        if(tabId === 'tab-fabrica') { atualizarSelectsDinamicos(); atualizarSelectProducao(); }
         if(tabId === 'tab-inv') renderizarInventario();
         if(tabId === 'tab-vendas') renderizarAbaVendas();
         if(tabId === 'tab-hist') renderizarHistoricos();
@@ -120,7 +105,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // ==========================================
-// ABA 2: INVENTÁRIO INSUMOS
+// INVENTÁRIO (ABA 3)
 // ==========================================
 document.getElementById('form-filamento').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -152,8 +137,8 @@ function renderizarInventario() {
                 <div class="item-title">
                     ${f.nome} 
                     <div style="display:flex; gap:0.3rem;">
-                        <button type="button" class="btn-small" style="background-color: var(--warning); color: #000; border: none; border-radius: 4px; cursor: pointer;" onclick="editarFil(${f.id})" title="Ajustar Peso Restante">✏️</button>
-                        <button type="button" class="btn-danger btn-small" style="border: none; border-radius: 4px; cursor: pointer;" onclick="apagarFil(${f.id})" title="Apagar Filamento">X</button>
+                        <button type="button" class="btn-small" style="background-color: var(--warning); color: #000; border: none; border-radius: 4px; cursor: pointer;" onclick="editarFil(${f.id})">✏️</button>
+                        <button type="button" class="btn-danger btn-small" style="border: none; border-radius: 4px; cursor: pointer;" onclick="apagarFil(${f.id})">X</button>
                     </div>
                 </div>
                 <div class="item-details">
@@ -175,8 +160,8 @@ function renderizarInventario() {
                 <div class="item-title">
                     ${x.nome} 
                     <div style="display:flex; gap:0.3rem;">
-                        <button type="button" class="btn-small" style="background-color: var(--warning); color: #000; border: none; border-radius: 4px; cursor: pointer;" onclick="editarExt(${x.id})" title="Ajustar Quantidade">✏️</button>
-                        <button type="button" class="btn-danger btn-small" style="border: none; border-radius: 4px; cursor: pointer;" onclick="apagarExt(${x.id})" title="Apagar Insumo">X</button>
+                        <button type="button" class="btn-small" style="background-color: var(--warning); color: #000; border: none; border-radius: 4px; cursor: pointer;" onclick="editarExt(${x.id})">✏️</button>
+                        <button type="button" class="btn-danger btn-small" style="border: none; border-radius: 4px; cursor: pointer;" onclick="apagarExt(${x.id})">X</button>
                     </div>
                 </div>
                 <div class="item-details">
@@ -188,27 +173,16 @@ function renderizarInventario() {
     });
 }
 
-// Funções de Edição (Ajuste de Estoque Manual)
 async function editarFil(id) {
     const fil = DB.filamentos.find(f => f.id === id);
     if(!fil) return;
-    
-    const novoPeso = prompt(`✏️ AJUSTE DE ESTOQUE\n\nFilamento: ${fil.nome}\nPeso Atual: ${fmtNum(fil.pesoRestante)}g\n\nDigite quantas gramas restam agora:`, fil.pesoRestante);
-    
+    const novoPeso = prompt(`Ajuste o peso atual (g) para o filamento ${fil.nome}:`, fil.pesoRestante);
     if (novoPeso !== null && novoPeso.trim() !== "") {
         const pesoNumerico = parseFloat(novoPeso.replace(',', '.'));
         if (!isNaN(pesoNumerico) && pesoNumerico >= 0) {
             fil.pesoRestante = pesoNumerico;
-            // Se colocar um peso maior que o inicial, ajusta o inicial para a barra não passar de 100%
-            if (fil.pesoRestante > fil.pesoInicial) {
-                fil.pesoInicial = fil.pesoRestante;
-                fil.custoPorGrama = fil.precoTotal / fil.pesoInicial; 
-            }
-            await salvarDB();
-            renderizarInventario();
-            atualizarSelectsDinamicos();
-        } else {
-            alert("Valor inválido. Digite apenas números.");
+            if (fil.pesoRestante > fil.pesoInicial) { fil.pesoInicial = fil.pesoRestante; fil.custoPorGrama = fil.precoTotal / fil.pesoInicial; }
+            await salvarDB(); renderizarInventario();
         }
     }
 }
@@ -216,43 +190,35 @@ async function editarFil(id) {
 async function editarExt(id) {
     const ext = DB.extras.find(e => e.id === id);
     if(!ext) return;
-    
     const sigla = ext.medida === 'Unidades' ? 'un' : ext.medida;
-    const novaQtd = prompt(`✏️ AJUSTE DE ESTOQUE\n\nInsumo: ${ext.nome}\nQuantidade Atual: ${fmtNum(ext.qtdRestante)} ${sigla}\n\nDigite quanto resta agora:`, ext.qtdRestante);
-    
+    const novaQtd = prompt(`Ajuste a quantidade atual (${sigla}) para o insumo ${ext.nome}:`, ext.qtdRestante);
     if (novaQtd !== null && novaQtd.trim() !== "") {
         const qtdNumerica = parseFloat(novaQtd.replace(',', '.'));
         if (!isNaN(qtdNumerica) && qtdNumerica >= 0) {
             ext.qtdRestante = qtdNumerica;
-            if (ext.qtdRestante > ext.qtdInicial) {
-                ext.qtdInicial = ext.qtdRestante;
-                ext.custoUnitario = ext.precoTotal / ext.qtdInicial; 
-            }
-            await salvarDB();
-            renderizarInventario();
-            atualizarSelectsDinamicos();
-        } else {
-            alert("Valor inválido. Digite apenas números.");
+            if (ext.qtdRestante > ext.qtdInicial) { ext.qtdInicial = ext.qtdRestante; ext.custoUnitario = ext.precoTotal / ext.qtdInicial; }
+            await salvarDB(); renderizarInventario();
         }
     }
 }
-
 async function apagarFil(id) { if(confirm("Apagar filamento?")) { DB.filamentos = DB.filamentos.filter(f => f.id !== id); await salvarDB(); renderizarInventario(); } }
 async function apagarExt(id) { if(confirm("Apagar insumo?")) { DB.extras = DB.extras.filter(x => x.id !== id); await salvarDB(); renderizarInventario(); } }
 
+
 // ==========================================
-// ABA 1: PRODUTOS, PRODUÇÃO E DESCARTES
+// DADOS DINÂMICOS (Puxa para Aba 1 e 2)
 // ==========================================
 function atualizarSelectsDinamicos() {
     for(let i=1; i<=4; i++) {
         const selectFil = document.getElementById(`calc-filamento-${i}`);
-        if(!selectFil) continue;
-        const valorAtual = selectFil.value;
-        selectFil.innerHTML = i === 1 ? '<option value="">Selecione no Inventário...</option>' : '<option value="">Nenhum...</option>';
-        DB.filamentos.forEach(f => {
-            const opt = document.createElement('option'); opt.value = f.id; opt.textContent = `${f.nome}`; selectFil.appendChild(opt);
-        });
-        selectFil.value = valorAtual;
+        if(selectFil) {
+            const valorAtual = selectFil.value;
+            selectFil.innerHTML = i === 1 ? '<option value="">Selecione no Inventário...</option>' : '<option value="">Nenhum...</option>';
+            DB.filamentos.forEach(f => {
+                const opt = document.createElement('option'); opt.value = f.id; opt.textContent = `${f.nome}`; selectFil.appendChild(opt);
+            });
+            selectFil.value = valorAtual;
+        }
     }
 
     const selectDesc = document.getElementById('desc-filamento');
@@ -282,6 +248,9 @@ function atualizarSelectsDinamicos() {
     }
 }
 
+// ==========================================
+// ABA 1: SIMULAÇÃO E CATÁLOGO
+// ==========================================
 document.getElementById('form-calc').addEventListener('submit', (e) => {
     e.preventDefault();
     const nomeProduto = document.getElementById('calc-nome').value;
@@ -318,33 +287,94 @@ document.getElementById('form-calc').addEventListener('submit', (e) => {
     });
 
     const custoTotal = custoFil + custoEne + custoMan + custoExt;
+    
+    // Markups baseados nas versões detalhadas solicitadas
+    const m3 = custoTotal * 3;
+    const m5 = custoTotal * 5;
+    const shopeeM3 = (m3 + 4) / 0.8;
+    const shopeeM5 = (m5 + 4) / 0.8;
 
+    // Custos Básicos
     document.getElementById('res-custo-fil').textContent = fmtDinheiro(custoFil);
     document.getElementById('res-custo-ener').textContent = fmtDinheiro(custoEne + custoMan);
     document.getElementById('res-custo-ext').textContent = fmtDinheiro(custoExt);
     document.getElementById('res-custo-total').textContent = fmtDinheiro(custoTotal);
     
+    // Lucros de Venda Direta
+    document.getElementById('res-m3').textContent = fmtDinheiro(m3);
+    document.getElementById('lucro-m3').textContent = `Lucro Líquido: ${fmtDinheiro(m3 - custoTotal)}`;
+    document.getElementById('res-m5').textContent = fmtDinheiro(m5);
+    document.getElementById('lucro-m5').textContent = `Lucro Líquido: ${fmtDinheiro(m5 - custoTotal)}`;
+    
+    // Shopee
+    document.getElementById('res-shopee-m3').textContent = fmtDinheiro(shopeeM3);
+    document.getElementById('res-shopee-m5').textContent = fmtDinheiro(shopeeM5);
+
+    // Configura o Simulador Dinâmico Shopee
+    document.getElementById('sim-shopee-preco').value = shopeeM5.toFixed(2);
+    
     simulacaoAtual = { id: Date.now(), nome: nomeProduto, custoTotal, filamentosUsados, extrasUsados };
+    atualizarSimulacaoShopee(shopeeM5, custoTotal);
     document.getElementById('painel-resultados').style.display = 'block';
 });
+
+// Simulador Dinâmico Shopee
+document.getElementById('sim-shopee-preco').addEventListener('input', (e) => {
+    if(simulacaoAtual) atualizarSimulacaoShopee(parseFloat(e.target.value), simulacaoAtual.custoTotal);
+});
+
+function atualizarSimulacaoShopee(precoVenda, custo) {
+    const elTaxa = document.getElementById('sim-shopee-taxa');
+    const elLiq = document.getElementById('sim-shopee-liquido');
+    const elLuc = document.getElementById('sim-shopee-lucro');
+    const alertBox = document.getElementById('alerta-shopee');
+
+    if(isNaN(precoVenda) || precoVenda <= 0) {
+        elTaxa.textContent = 'R$ 0,00'; elLiq.textContent = 'R$ 0,00'; elLuc.textContent = 'R$ 0,00';
+        alertBox.style.display = 'none'; return;
+    }
+
+    const taxa = 4 + (precoVenda * 0.20);
+    const liquido = precoVenda - taxa;
+    const lucro = liquido - custo;
+
+    elTaxa.textContent = fmtDinheiro(taxa);
+    elLiq.textContent = fmtDinheiro(liquido);
+    elLuc.textContent = fmtDinheiro(lucro);
+    elLuc.className = lucro >= 0 ? 'text-success' : 'text-danger';
+    
+    if(lucro < 0) {
+        alertBox.className = 'alert-box alert-danger';
+        alertBox.innerHTML = '🚨 PREJUÍZO! Venda não cobre taxas e custo de produção.';
+        alertBox.style.display = 'block';
+    } else if(lucro < 1) {
+        alertBox.className = 'alert-box alert-warning';
+        alertBox.innerHTML = '⚠️ SEM LUCRO! Vendendo a preço de custo.';
+        alertBox.style.display = 'block';
+    } else {
+        alertBox.style.display = 'none';
+    }
+}
 
 document.getElementById('btn-salvar-receita').addEventListener('click', async () => {
     if(!simulacaoAtual) return;
     DB.receitas.push(simulacaoAtual);
     await salvarDB();
-    alert(`Receita "${simulacaoAtual.nome}" salva no Catálogo!`);
+    alert(`Receita "${simulacaoAtual.nome}" salva no Catálogo! Vá até a Aba 2 para produzir.`);
     document.getElementById('painel-resultados').style.display = 'none';
     document.getElementById('form-calc').reset();
     simulacaoAtual = null;
-    atualizarSelectProducao();
 });
 
+// ==========================================
+// ABA 2: FÁBRICA (Produção e Descarte)
+// ==========================================
 function atualizarSelectProducao() {
     const sel = document.getElementById('prod-receita');
     if(!sel) return;
     sel.innerHTML = '<option value="">Selecione um produto salvo...</option>';
     DB.receitas.forEach(r => {
-        const opt = document.createElement('option'); opt.value = r.id; opt.textContent = `${r.nome} (Custo Médio: ${fmtDinheiro(r.custoTotal)})`; sel.appendChild(opt);
+        const opt = document.createElement('option'); opt.value = r.id; opt.textContent = `${r.nome} (Custo Base: ${fmtDinheiro(r.custoTotal)})`; sel.appendChild(opt);
     });
 }
 
@@ -355,19 +385,21 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     const receita = DB.receitas.find(r => r.id === receitaId);
     if(!receita) return;
 
+    // Validação de Estoque
     for(let fUsado of receita.filamentosUsados) {
         const fil = DB.filamentos.find(f => f.id === fUsado.id);
         if(!fil || fil.pesoRestante < (fUsado.peso * qtdProduzir)) {
-            alert(`Falta filamento! A receita precisa de ${fmtNum(fUsado.peso * qtdProduzir)}g de "${fUsado.nome}".`); return;
+            alert(`Falta filamento! O projeto precisa de ${fmtNum(fUsado.peso * qtdProduzir)}g de "${fUsado.nome}". Você não tem o suficiente no inventário.`); return;
         }
     }
     for(let eUsado of receita.extrasUsados) {
         const ext = DB.extras.find(ex => ex.id === eUsado.id);
         if(!ext || ext.qtdRestante < (eUsado.qtd * qtdProduzir)) {
-            alert(`Falta insumo! A receita precisa de ${fmtNum(eUsado.qtd * qtdProduzir)} de "${eUsado.nome}".`); return;
+            alert(`Falta insumo! O projeto precisa de ${fmtNum(eUsado.qtd * qtdProduzir)} de "${eUsado.nome}". Você não tem o suficiente no inventário.`); return;
         }
     }
 
+    // Baixa
     receita.filamentosUsados.forEach(fUsado => {
         const fil = DB.filamentos.find(f => f.id === fUsado.id);
         fil.pesoRestante -= (fUsado.peso * qtdProduzir);
@@ -377,6 +409,7 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
         ext.qtdRestante -= (eUsado.qtd * qtdProduzir);
     });
 
+    // Salva Estoque Pronto
     let itemEstoque = DB.estoqueProntos.find(p => p.receitaId === receita.id);
     if(itemEstoque) {
         itemEstoque.quantidade += qtdProduzir;
@@ -385,18 +418,18 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
         DB.estoqueProntos.push({ id: Date.now(), receitaId: receita.id, nome: receita.nome, custoUnitario: receita.custoTotal, quantidade: qtdProduzir });
     }
 
+    // Salva Histórico
     DB.historicoProducao.push({
         id: Date.now(), data: new Date().toLocaleDateString('pt-BR', {hour: '2-digit', minute:'2-digit'}),
         nomeProduto: receita.nome, quantidade: qtdProduzir, custoTotalFornada: receita.custoTotal * qtdProduzir
     });
 
     await salvarDB();
-    alert(`📦 Sucesso! ${qtdProduzir} unidade(s) de "${receita.nome}" fabricadas e adicionadas ao estoque pronto.`);
+    alert(`📦 ${qtdProduzir} unidade(s) de "${receita.nome}" produzida(s) com sucesso!\n\nFoi transferido para a aba Estoque Pronto.`);
     document.getElementById('form-producao').reset();
     atualizarSelectsDinamicos();
 });
 
-// Registrar Descarte/Teste
 document.getElementById('form-descarte').addEventListener('submit', async (e) => {
     e.preventDefault();
     const tipo = document.getElementById('desc-tipo').value;
@@ -408,12 +441,11 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
 
     const fil = DB.filamentos.find(f => f.id === filId);
     if(!fil || peso > fil.pesoRestante) {
-        alert("Quantidade gasta maior do que o estoque disponível do filamento selecionado.");
-        return;
+        alert("Quantidade gasta maior do que o estoque disponível."); return;
     }
 
-    const kw = parseFloat(document.getElementById('calc-kw').value) || 0.15;
-    const kwh = parseFloat(document.getElementById('calc-preco-kwh').value) || 0.95;
+    const kw = parseFloat(document.getElementById('desc-kw').value) || 0.15;
+    const kwh = parseFloat(document.getElementById('desc-preco-kwh').value) || 0.95;
 
     const custoMaterial = peso * fil.custoPorGrama;
     const custoEletrico = (horas + (min / 60)) * kw * kwh;
@@ -428,13 +460,13 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
     });
 
     await salvarDB();
-    alert(`🗑️ Registro salvo. Você teve um custo (perda) de ${fmtDinheiro(custoTotalPerda)} nesta operação.`);
+    alert(`🗑️ Registro salvo. A perda financeira calculada foi de ${fmtDinheiro(custoTotalPerda)}.`);
     document.getElementById('form-descarte').reset();
     atualizarSelectsDinamicos(); 
 });
 
 // ==========================================
-// ABA 3: VENDAS E ESTOQUE PRONTO
+// ABA 4: VENDAS
 // ==========================================
 function renderizarAbaVendas() {
     const elLista = document.getElementById('lista-estoque-prontos');
@@ -447,7 +479,7 @@ function renderizarAbaVendas() {
                 <div class="item-title">${p.nome}</div>
                 <div class="item-details">
                     <span style="font-weight: bold; font-size: 1rem; color: var(--text-main);">Em estoque: ${p.quantidade} un.</span>
-                    <span>Custo de Fab.: ${fmtDinheiro(p.custoUnitario)}</span>
+                    <span>Custo Base Fab.: ${fmtDinheiro(p.custoUnitario)}</span>
                 </div>
             </div>`;
     });
@@ -484,7 +516,7 @@ const calcularPrevVenda = () => {
 
     const lucroLiquido = receitaBruta - custoTotalFornada - taxaTotal;
 
-    elCusto.textContent = fmtDinheiro(produto.custoUnitario);
+    elCusto.textContent = fmtDinheiro(produto.custoUnitario * qtd);
     elTaxa.textContent = fmtDinheiro(taxaTotal);
     elLucro.textContent = fmtDinheiro(lucroLiquido);
     elLucro.className = lucroLiquido > 0 ? 'text-success' : 'text-danger';
@@ -503,12 +535,11 @@ document.getElementById('form-venda').addEventListener('submit', async (e) => {
     const precoUni = parseFloat(document.getElementById('venda-preco').value);
 
     const produto = DB.estoqueProntos.find(p => p.id === prodId);
-    if(qtd > produto.quantidade) { alert("Você não tem essa quantidade no estoque de produtos prontos!"); return; }
+    if(qtd > produto.quantidade) { alert("Você não tem essa quantidade pronta!"); return; }
 
     const custoTotalFab = produto.custoUnitario * qtd;
     let taxa = 0;
     if(canal === 'Shopee') { taxa = ((precoUni * 0.20) + 4) * qtd; }
-    
     const lucro = (precoUni * qtd) - custoTotalFab - taxa;
 
     produto.quantidade -= qtd;
@@ -520,14 +551,14 @@ document.getElementById('form-venda').addEventListener('submit', async (e) => {
     });
 
     await salvarDB();
-    alert(`💲 Venda registrada com sucesso! Lucro apurado: ${fmtDinheiro(lucro)}`);
+    alert(`💲 Venda salva! Lucro líquido adicionado ao histórico: ${fmtDinheiro(lucro)}`);
     document.getElementById('form-venda').reset();
     calcularPrevVenda();
     renderizarAbaVendas();
 });
 
 // ==========================================
-// ABA 4: HISTÓRICO GERAL
+// ABA 5: HISTÓRICO
 // ==========================================
 function renderizarHistoricos() {
     const elVendas = document.getElementById('lista-historico-vendas');
@@ -542,7 +573,7 @@ function renderizarHistoricos() {
                     <span class="badge">${v.data}</span>
                 </div>
                 <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
-                    Canal: <strong>${v.canal}</strong> | Faturamento: <strong>${fmtDinheiro(v.precoVendaTotal)}</strong>
+                    Canal: <strong>${v.canal}</strong> | Total Cobrado: <strong>${fmtDinheiro(v.precoVendaTotal)}</strong>
                 </div>
                 <div class="res-row destaque" style="border:none; padding:0; margin-top:0.3rem;">
                     <span style="font-size: 0.9rem;">Lucro Líquido Real:</span>
@@ -563,7 +594,7 @@ function renderizarHistoricos() {
                     <span class="badge">${p.data}</span>
                 </div>
                 <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
-                    Custo total da fornada: <strong>${fmtDinheiro(p.custoTotalFornada)}</strong>
+                    Custo Total Produção: <strong>${fmtDinheiro(p.custoTotalFornada)}</strong>
                 </div>
             </div>`;
     });
@@ -583,7 +614,7 @@ function renderizarHistoricos() {
                     Tempo perdido: <strong>${p.tempoGasto}</strong> | Motivo: <strong>${p.motivo}</strong>
                 </div>
                 <div class="res-row destaque" style="border:none; padding:0; margin-top:0.3rem;">
-                    <span style="font-size: 0.9rem; color: var(--text-muted);">Custo da Perda (Material + Eletricidade):</span>
+                    <span style="font-size: 0.9rem; color: var(--text-muted);">Prejuízo (Material + Eletricidade):</span>
                     <strong class="text-danger">-${fmtDinheiro(p.custoTotal)}</strong>
                 </div>
             </div>`;
@@ -592,7 +623,6 @@ function renderizarHistoricos() {
 
 function iniciarApp() {
     atualizarSelectsDinamicos();
-    atualizarSelectProducao();
 }
 
 document.addEventListener('DOMContentLoaded', iniciarNuvem);

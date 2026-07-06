@@ -8,15 +8,255 @@
 </head>
 <body>
 
+    <!-- NAVEGAÇÃO -->
     <nav class="tabs-nav">
-        <button class="tab-btn active" data-tab="tab-calc">1. Produtos & Produção</button>
-        <button class="tab-btn" data-tab="tab-inv">2. Inventário de Insumos</button>
-        <button class="tab-btn" data-tab="tab-vendas">3. Vendas & Estoque</button>
-        <button class="tab-btn" data-tab="tab-hist">4. Histórico Geral</button>
+        <button class="tab-btn active" data-tab="tab-calc">1. Simulações</button>
+        <button class="tab-btn" data-tab="tab-fabrica">2. Fábrica & Descartes</button>
+        <button class="tab-btn" data-tab="tab-inv">3. Inventário</button>
+        <button class="tab-btn" data-tab="tab-vendas">4. Vendas</button>
+        <button class="tab-btn" data-tab="tab-hist">5. Histórico</button>
     </nav>
 
     <div class="container">
         
+        <!-- ========================================== -->
+        <!-- ABA 1: SIMULAÇÕES E CATÁLOGO -->
+        <!-- ========================================== -->
+        <div id="tab-calc" class="tab-content active">
+            <h1>Simulação de Custos e Preços</h1>
+            <p class="ajuda">Faça o orçamento detalhado da peça. O estoque não será alterado aqui.</p>
+            
+            <div class="card">
+                <form id="form-calc">
+                    <div class="form-col" style="margin-bottom: 1.5rem;">
+                        <label>Nome do Produto (Ex: Luminária Mario):</label>
+                        <input type="text" id="calc-nome" required>
+                    </div>
+
+                    <fieldset>
+                        <legend>Uso de Filamentos (Até 4 cores)</legend>
+                        <p class="ajuda" style="margin-bottom: 0.5rem;">Preencha apenas os que for utilizar.</p>
+                        
+                        <div class="form-row">
+                            <div class="form-col" style="flex: 2;">
+                                <label>Cor 1 (Principal):</label>
+                                <select id="calc-filamento-1" class="calc-filamento-select" required>
+                                    <option value="">Selecione no Inventário...</option>
+                                </select>
+                            </div>
+                            <div class="form-col">
+                                <label>Peso (g):</label>
+                                <input type="number" id="calc-peso-1" class="calc-filamento-peso" step="0.1" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-col" style="flex: 2;">
+                                <label>Cor 2 (Opcional):</label>
+                                <select id="calc-filamento-2" class="calc-filamento-select">
+                                    <option value="">Nenhum...</option>
+                                </select>
+                            </div>
+                            <div class="form-col">
+                                <label>Peso (g):</label>
+                                <input type="number" id="calc-peso-2" class="calc-filamento-peso" step="0.1" placeholder="0">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-col" style="flex: 2;">
+                                <label>Cor 3 (Opcional):</label>
+                                <select id="calc-filamento-3" class="calc-filamento-select">
+                                    <option value="">Nenhum...</option>
+                                </select>
+                            </div>
+                            <div class="form-col">
+                                <label>Peso (g):</label>
+                                <input type="number" id="calc-peso-3" class="calc-filamento-peso" step="0.1" placeholder="0">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-col" style="flex: 2;">
+                                <label>Cor 4 (Opcional):</label>
+                                <select id="calc-filamento-4" class="calc-filamento-select">
+                                    <option value="">Nenhum...</option>
+                                </select>
+                            </div>
+                            <div class="form-col">
+                                <label>Peso (g):</label>
+                                <input type="number" id="calc-peso-4" class="calc-filamento-peso" step="0.1" placeholder="0">
+                            </div>
+                        </div>
+
+                        <div id="aviso-estoque-filamento" style="font-size: 0.85rem; margin-top: 0.5rem; margin-bottom: 1rem;"></div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Energia Elétrica</legend>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label>Tempo (Horas):</label>
+                                <input type="number" id="calc-horas" min="0" value="0" required>
+                            </div>
+                            <div class="form-col">
+                                <label>Tempo (Minutos):</label>
+                                <input type="number" id="calc-minutos" min="0" max="59" value="0" required>
+                            </div>
+                            <div class="form-col">
+                                <label>Consumo Impressora (kW):</label>
+                                <input type="number" id="calc-kw" step="0.001" value="0.15" required>
+                            </div>
+                            <div class="form-col">
+                                <label>Preço kWh (R$):</label>
+                                <input type="number" id="calc-preco-kwh" step="0.01" value="0.95" required>
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Insumos Extras</legend>
+                        <div id="calc-lista-extras" style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
+                            <!-- Injetado via JS -->
+                        </div>
+                    </fieldset>
+
+                    <button type="submit" style="width: 100%;">💡 Simular Custos</button>
+                </form>
+
+                <!-- PAINEL DE RESULTADO DETALHADO E SALVAMENTO -->
+                <div id="painel-resultados" class="card-alt" style="display: none; padding: 1.5rem; border-radius: 8px; margin-top: 1.5rem; border: 1px solid var(--border);">
+                    <h2>Análise Financeira</h2>
+                    <div class="res-row">
+                        <span>Custo dos Filamentos:</span><span id="res-custo-fil">R$ 0,00</span>
+                    </div>
+                    <div class="res-row">
+                        <span>Energia + Manut. (1%):</span><span id="res-custo-ener">R$ 0,00</span>
+                    </div>
+                    <div class="res-row">
+                        <span>Custo Insumos:</span><span id="res-custo-ext">R$ 0,00</span>
+                    </div>
+                    <div class="res-row destaque">
+                        <span>CUSTO DE PRODUÇÃO:</span><strong id="res-custo-total" class="text-danger">R$ 0,00</strong>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h3>Venda Direta (Markups)</h3>
+                    <div class="res-row">
+                        <span>Atacado (M3 - 3x): <strong id="res-m3">R$ 0,00</strong></span>
+                        <span class="lucro text-success" id="lucro-m3">Lucro: R$ 0,00</span>
+                    </div>
+                    <div class="res-row">
+                        <span>Varejo (M5 - 5x): <strong id="res-m5">R$ 0,00</strong></span>
+                        <span class="lucro text-success" id="lucro-m5">Lucro: R$ 0,00</span>
+                    </div>
+
+                    <hr>
+
+                    <h3>Venda na Shopee (Taxa 20% + R$4)</h3>
+                    <div class="res-row">
+                        <span>Sugestão para manter lucro M3: <strong id="res-shopee-m3">R$ 0,00</strong></span>
+                    </div>
+                    <div class="res-row">
+                        <span>Sugestão para manter lucro M5: <strong id="res-shopee-m5">R$ 0,00</strong></span>
+                    </div>
+
+                    <div style="background: var(--bg-input); padding: 1rem; border-radius: 6px; margin-top: 1rem;">
+                        <label style="color: var(--shopee); font-weight: bold;">Simulador Dinâmico (Shopee R$):</label>
+                        <input type="number" id="sim-shopee-preco" step="0.01" style="margin-top: 0.5rem; margin-bottom: 1rem;">
+                        
+                        <div class="res-row"><span>Taxa Retida:</span><span id="sim-shopee-taxa">R$ 0,00</span></div>
+                        <div class="res-row"><span>Valor Líquido:</span><span id="sim-shopee-liquido">R$ 0,00</span></div>
+                        <div class="res-row destaque" style="border-top: none; padding-top: 0;">
+                            <span>SEU LUCRO REAL:</span><strong id="sim-shopee-lucro">R$ 0,00</strong>
+                        </div>
+                        <div id="alerta-shopee" style="display: none;" class="alert-box"></div>
+                    </div>
+                    
+                    <button type="button" id="btn-salvar-receita" class="btn-primary" style="width: 100%; margin-top: 1.5rem;">💾 Salvar Receita no Catálogo</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- ABA 2: FÁBRICA E DESCARTES -->
+        <!-- ========================================== -->
+        <div id="tab-fabrica" class="tab-content">
+            <h1>Chão de Fábrica</h1>
+            <p class="ajuda">Registre a produção real e perdas para manter seu inventário atualizado.</p>
+            
+            <div class="card" style="border-color: var(--success);">
+                <h2 style="color: var(--success);">📦 Registrar Produção Concluída</h2>
+                <form id="form-producao">
+                    <div class="form-row">
+                        <div class="form-col" style="flex: 3;">
+                            <label>Escolha o Projeto (Receita):</label>
+                            <select id="prod-receita" required>
+                                <option value="">Selecione um produto salvo...</option>
+                            </select>
+                        </div>
+                        <div class="form-col" style="flex: 1;">
+                            <label>Quantidade:</label>
+                            <input type="number" id="prod-qtd" min="1" step="1" value="1" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn-success">Fabricar Peça(s)</button>
+                </form>
+            </div>
+
+            <hr>
+
+            <div class="card" style="border-color: var(--warning);">
+                <h2 style="color: var(--warning);">🗑️ Registro de Perdas e Testes</h2>
+                <form id="form-descarte">
+                    <div class="form-row">
+                        <div class="form-col">
+                            <label>Tipo:</label>
+                            <select id="desc-tipo" required>
+                                <option value="Teste">Teste / Calibração</option>
+                                <option value="Descarte">Falha / Descarte</option>
+                            </select>
+                        </div>
+                        <div class="form-col" style="flex: 2;">
+                            <label>Filamento Desperdiçado:</label>
+                            <select id="desc-filamento" required>
+                                <option value="">Selecione no Inventário...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-col">
+                            <label>Peso (g):</label>
+                            <input type="number" id="desc-peso" step="0.1" required>
+                        </div>
+                        <div class="form-col">
+                            <label>Tempo Perdido (Horas):</label>
+                            <input type="number" id="desc-horas" min="0" value="0" required>
+                        </div>
+                        <div class="form-col">
+                            <label>Tempo Perdido (Min):</label>
+                            <input type="number" id="desc-min" min="0" max="59" value="0" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-col">
+                            <label>Motivo (Opcional):</label>
+                            <input type="text" id="desc-motivo" placeholder="Ex: Falha de aderência">
+                        </div>
+                    </div>
+                    <!-- Inputs ocultos para cálculo da perda elétrica baseado no padrão da impressora -->
+                    <input type="hidden" id="desc-kw" value="0.15">
+                    <input type="hidden" id="desc-preco-kwh" value="0.95">
+                    
+                    <button type="submit" style="background-color: var(--warning); color: #000;">Registrar Perda de Material</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- ABA 3: INVENTÁRIO -->
+        <!-- ========================================== -->
         <div id="tab-inv" class="tab-content">
             <h1>Inventário de Matéria-Prima</h1>
             
@@ -85,202 +325,15 @@
             </div>
         </div>
 
-        <div id="tab-calc" class="tab-content active">
-            <h1>Engenharia e Fábrica</h1>
-            
-            <div class="card">
-                <h2>1. Simular e Salvar Receita (Catálogo)</h2>
-                <p class="ajuda">Crie o projeto e salve a fórmula para produzir depois.</p>
-                <form id="form-calc">
-                    <div class="form-col" style="margin-bottom: 1.5rem;">
-                        <label>Nome do Produto (Ex: Chaveiro Harry Potter):</label>
-                        <input type="text" id="calc-nome" required>
-                    </div>
-
-                    <fieldset>
-                        <legend>Uso de Filamentos (Até 4 cores/materiais)</legend>
-                        <p class="ajuda" style="margin-bottom: 0.5rem;">Preencha apenas os que for utilizar.</p>
-                        
-                        <div class="form-row">
-                            <div class="form-col" style="flex: 2;">
-                                <label>Cor 1 (Principal):</label>
-                                <select id="calc-filamento-1" class="calc-filamento-select" required>
-                                    <option value="">Selecione no Inventário...</option>
-                                </select>
-                            </div>
-                            <div class="form-col">
-                                <label>Peso (g):</label>
-                                <input type="number" id="calc-peso-1" class="calc-filamento-peso" step="0.1" required>
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-col" style="flex: 2;">
-                                <label>Cor 2 (Opcional):</label>
-                                <select id="calc-filamento-2" class="calc-filamento-select">
-                                    <option value="">Nenhum...</option>
-                                </select>
-                            </div>
-                            <div class="form-col">
-                                <label>Peso (g):</label>
-                                <input type="number" id="calc-peso-2" class="calc-filamento-peso" step="0.1" placeholder="0">
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-col" style="flex: 2;">
-                                <label>Cor 3 (Opcional):</label>
-                                <select id="calc-filamento-3" class="calc-filamento-select">
-                                    <option value="">Nenhum...</option>
-                                </select>
-                            </div>
-                            <div class="form-col">
-                                <label>Peso (g):</label>
-                                <input type="number" id="calc-peso-3" class="calc-filamento-peso" step="0.1" placeholder="0">
-                            </div>
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-col" style="flex: 2;">
-                                <label>Cor 4 (Opcional):</label>
-                                <select id="calc-filamento-4" class="calc-filamento-select">
-                                    <option value="">Nenhum...</option>
-                                </select>
-                            </div>
-                            <div class="form-col">
-                                <label>Peso (g):</label>
-                                <input type="number" id="calc-peso-4" class="calc-filamento-peso" step="0.1" placeholder="0">
-                            </div>
-                        </div>
-
-                        <div id="aviso-estoque-filamento" style="font-size: 0.85rem; margin-top: 0.5rem; margin-bottom: 1rem;"></div>
-                    </fieldset>
-
-                    <fieldset>
-                        <legend>Energia Elétrica (Padrão da Impressora)</legend>
-                        <div class="form-row">
-                            <div class="form-col">
-                                <label>Tempo (Horas):</label>
-                                <input type="number" id="calc-horas" min="0" value="0" required>
-                            </div>
-                            <div class="form-col">
-                                <label>Tempo (Minutos):</label>
-                                <input type="number" id="calc-minutos" min="0" max="59" value="0" required>
-                            </div>
-                            <div class="form-col">
-                                <label>Consumo Impressora (kW):</label>
-                                <input type="number" id="calc-kw" step="0.001" value="0.15" required>
-                            </div>
-                            <div class="form-col">
-                                <label>Preço kWh (R$):</label>
-                                <input type="number" id="calc-preco-kwh" step="0.01" value="0.95" required>
-                            </div>
-                        </div>
-                    </fieldset>
-
-                    <fieldset>
-                        <legend>Insumos Utilizados nesta peça</legend>
-                        <p class="ajuda" style="margin-bottom: 0;">Deixe 0 nos itens que não for usar.</p>
-                        <div id="calc-lista-extras" style="margin-top: 1rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
-                            </div>
-                    </fieldset>
-
-                    <button type="submit" style="width: 100%;">💡 Simular Custos</button>
-                </form>
-
-                <div id="painel-resultados" class="card-alt" style="display: none; padding: 1.5rem; border-radius: 8px; margin-top: 1.5rem; border: 1px solid var(--border);">
-                    <h2>Resumo Financeiro da Receita</h2>
-                    <div class="res-row">
-                        <span>Custo dos Filamentos:</span><span id="res-custo-fil">R$ 0,00</span>
-                    </div>
-                    <div class="res-row">
-                        <span>Custo Energia + Manut.:</span><span id="res-custo-ener">R$ 0,00</span>
-                    </div>
-                    <div class="res-row">
-                        <span>Custo Insumos:</span><span id="res-custo-ext">R$ 0,00</span>
-                    </div>
-                    <div class="res-row destaque">
-                        <span>CUSTO TOTAL:</span><span id="res-custo-total" class="text-danger">R$ 0,00</span>
-                    </div>
-                    
-                    <button type="button" id="btn-salvar-receita" class="btn-primary" style="width: 100%; margin-top: 1rem;">💾 Salvar Receita no Catálogo</button>
-                </div>
-            </div>
-
-            <hr>
-            <div class="card" style="border-color: var(--success);">
-                <h2 style="color: var(--success);">2. Fábrica (Registrar Produção)</h2>
-                <p class="ajuda">Escolha um produto do catálogo para produzir. O estoque de matéria-prima será descontado.</p>
-                <form id="form-producao">
-                    <div class="form-row">
-                        <div class="form-col" style="flex: 3;">
-                            <label>Produto (Receita):</label>
-                            <select id="prod-receita" required>
-                                <option value="">Selecione um produto salvo...</option>
-                            </select>
-                        </div>
-                        <div class="form-col" style="flex: 1;">
-                            <label>Quantidade a produzir:</label>
-                            <input type="number" id="prod-qtd" min="1" step="1" value="1" required>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn-success">📦 Fabricar Peça(s)</button>
-                </form>
-            </div>
-
-            <hr>
-            <div class="card" style="border-color: var(--warning);">
-                <h2 style="color: var(--warning);">3. Registro de Descarte e Testes</h2>
-                <p class="ajuda">Registre peças falhas ou calibrações. O material será descontado e o custo irá para as perdas.</p>
-                <form id="form-descarte">
-                    <div class="form-row">
-                        <div class="form-col">
-                            <label>Tipo de Registro:</label>
-                            <select id="desc-tipo" required>
-                                <option value="Teste">Peça Teste / Calibração</option>
-                                <option value="Descarte">Falha / Descarte</option>
-                            </select>
-                        </div>
-                        <div class="form-col" style="flex: 2;">
-                            <label>Filamento Desperdiçado:</label>
-                            <select id="desc-filamento" required>
-                                <option value="">Selecione no Inventário...</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-col">
-                            <label>Peso Gasto (g):</label>
-                            <input type="number" id="desc-peso" step="0.1" required>
-                        </div>
-                        <div class="form-col">
-                            <label>Tempo Perdido (Horas):</label>
-                            <input type="number" id="desc-horas" min="0" value="0" required>
-                        </div>
-                        <div class="form-col">
-                            <label>Tempo Perdido (Min):</label>
-                            <input type="number" id="desc-min" min="0" max="59" value="0" required>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-col">
-                            <label>Motivo / Detalhes (Opcional):</label>
-                            <input type="text" id="desc-motivo" placeholder="Ex: Cubo de calibração Ender 3 ou falha de aderência no PLA">
-                        </div>
-                    </div>
-                    <button type="submit" style="background-color: var(--warning); color: #000;">🗑️ Registrar Baixa por Perda/Teste</button>
-                </form>
-            </div>
-        </div>
-
+        <!-- ========================================== -->
+        <!-- ABA 4: VENDAS E ESTOQUE PRONTO -->
+        <!-- ========================================== -->
         <div id="tab-vendas" class="tab-content">
             <h1>Estoque Pronto & Vendas</h1>
             
             <div class="card card-alt">
-                <h3>📦 Meu Estoque de Produtos Prontos</h3>
-                <p class="ajuda">Peças que já foram fabricadas e estão aguardando venda.</p>
-                <div id="lista-estoque-prontos" class="grid-list">
-                    </div>
+                <h3>📦 Produtos Disponíveis para Venda</h3>
+                <div id="lista-estoque-prontos" class="grid-list"></div>
             </div>
 
             <div class="card" style="border-color: var(--primary);">
@@ -304,19 +357,19 @@
                             <select id="venda-canal" required>
                                 <option value="Varejo">Varejo (Venda Direta)</option>
                                 <option value="Atacado">Atacado (Lote/Revenda)</option>
-                                <option value="Shopee">Shopee (Taxa de 20% + R$4)</option>
+                                <option value="Shopee">Shopee (Taxa 20% + R$4)</option>
                             </select>
                         </div>
                         <div class="form-col">
-                            <label>Preço Cobrado por Unidade (R$):</label>
-                            <input type="number" id="venda-preco" step="0.01" required placeholder="Ex: 50.00">
+                            <label>Preço de Venda Unitário (R$):</label>
+                            <input type="number" id="venda-preco" step="0.01" required>
                         </div>
                     </div>
 
                     <div id="prev-venda" style="background: var(--bg-input); padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border: 1px dashed var(--border);">
-                        <div class="res-row"><span>Custo de Fabricação (Unidade):</span> <strong id="prev-custo">R$ 0,00</strong></div>
+                        <div class="res-row"><span>Custo de Fabricação Total:</span> <strong id="prev-custo">R$ 0,00</strong></div>
                         <div class="res-row"><span>Taxas da Plataforma:</span> <strong id="prev-taxa" class="text-danger">R$ 0,00</strong></div>
-                        <div class="res-row destaque"><span>LUCRO LÍQUIDO PREVISTO (Total):</span> <strong id="prev-lucro">R$ 0,00</strong></div>
+                        <div class="res-row destaque"><span>LUCRO LÍQUIDO (Total):</span> <strong id="prev-lucro">R$ 0,00</strong></div>
                     </div>
 
                     <button type="submit" style="width: 100%;">💲 Confirmar Venda</button>
@@ -324,21 +377,24 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ABA 5: HISTÓRICO GERAL -->
+        <!-- ========================================== -->
         <div id="tab-hist" class="tab-content">
-            <h1>Histórico Financeiro e Operacional</h1>
+            <h1>Relatórios</h1>
             
             <div class="card card-alt" style="margin-bottom: 2rem;">
-                <h3 style="color: var(--success);">📈 Histórico de Vendas (Lucro)</h3>
+                <h3 style="color: var(--success);">📈 Vendas Realizadas</h3>
                 <div id="lista-historico-vendas" style="display: flex; flex-direction: column; gap: 1rem;"></div>
             </div>
 
             <div class="card card-alt" style="margin-bottom: 2rem;">
-                <h3 style="color: var(--primary);">⚙️ Histórico de Produção (Fábrica)</h3>
+                <h3 style="color: var(--primary);">⚙️ Produção Concluída</h3>
                 <div id="lista-historico-producao" style="display: flex; flex-direction: column; gap: 1rem;"></div>
             </div>
 
             <div class="card card-alt" style="border-left: 4px solid var(--warning);">
-                <h3 style="color: var(--warning);">🗑️ Histórico de Descartes e Testes (Perdas)</h3>
+                <h3 style="color: var(--warning);">🗑️ Perdas e Descartes</h3>
                 <div id="lista-historico-perdas" style="display: flex; flex-direction: column; gap: 1rem;"></div>
             </div>
         </div>
