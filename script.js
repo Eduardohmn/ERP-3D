@@ -15,12 +15,36 @@ let GIST_ID = localStorage.getItem('gist_id');
 
 async function iniciarNuvem() {
     if (!GITHUB_TOKEN || !GIST_ID) {
-        GITHUB_TOKEN = prompt("☁️ Bem-vindo ao ERP em Nuvem!\n\nCole aqui o seu GITHUB PERSONAL ACCESS TOKEN (PAT):");
-        GIST_ID = prompt("Agora, cole aqui o ID numérico do seu Gist:");
+        // Agora pede tudo em um único campo
+        const inputDados = prompt(
+            "☁️ Bem-vindo ao ERP em Nuvem!\n\n" +
+            "Cole aqui as DUAS CHAVES juntas (pode ter espaço ou estar tudo colado).\n\n" +
+            "Exemplo: ghp_SuaChave123 SeuGistID456"
+        );
         
-        if(GITHUB_TOKEN && GIST_ID) {
-            localStorage.setItem('github_token', GITHUB_TOKEN);
-            localStorage.setItem('gist_id', GIST_ID);
+        if (inputDados) {
+            // Usa Regex para caçar o Token do GitHub (que sempre começa com ghp_)
+            const tokenMatch = inputDados.match(/(ghp_[a-zA-Z0-9]+)/);
+            
+            if (tokenMatch) {
+                GITHUB_TOKEN = tokenMatch[1];
+                
+                // O Gist ID é o que sobrar depois de retirar o Token e limpar caracteres especiais/espaços
+                GIST_ID = inputDados.replace(GITHUB_TOKEN, '').replace(/[^a-zA-Z0-9]/g, '').trim();
+                
+                if (GIST_ID.length > 0) {
+                    localStorage.setItem('github_token', GITHUB_TOKEN);
+                    localStorage.setItem('gist_id', GIST_ID);
+                } else {
+                    alert("⚠️ O Token foi encontrado, mas não conseguimos achar o ID do Gist no texto colado.\n\nIniciando no modo Offline.");
+                    iniciarApp(); 
+                    return;
+                }
+            } else {
+                alert("⚠️ Não conseguimos encontrar um Token válido começando com 'ghp_' no texto.\n\nIniciando no modo Offline.");
+                iniciarApp(); 
+                return;
+            }
         } else {
             alert("Modo offline ativado (dados não serão sincronizados). Recarregue a página para configurar a nuvem.");
             iniciarApp(); 
@@ -47,7 +71,7 @@ async function iniciarNuvem() {
             DB.estoqueProntos = cloudDB.estoqueProntos || [];
             DB.historicoProducao = cloudDB.historicoProducao || [];
             DB.historicoVendas = cloudDB.historicoVendas || [];
-            DB.historicoPerdas = cloudDB.historicoPerdas || []; // Nova linha
+            DB.historicoPerdas = cloudDB.historicoPerdas || []; 
         }
 
         document.title = "Gestão 3D Pro - ERP (Nuvem ☁️)";
@@ -326,7 +350,6 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
         return;
     }
 
-    // Pega as configurações de energia do painel principal para calcular o desperdício
     const kw = parseFloat(document.getElementById('calc-kw').value) || 0.15;
     const kwh = parseFloat(document.getElementById('calc-preco-kwh').value) || 0.95;
 
@@ -334,10 +357,8 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
     const custoEletrico = (horas + (min / 60)) * kw * kwh;
     const custoTotalPerda = custoMaterial + custoEletrico;
 
-    // Baixa do Estoque
     fil.pesoRestante -= peso;
 
-    // Salvar Perda
     DB.historicoPerdas.push({
         id: Date.now(), data: new Date().toLocaleDateString('pt-BR', {hour: '2-digit', minute:'2-digit'}),
         tipo: tipo, filamentoNome: fil.nome, pesoGasto: peso, 
@@ -347,7 +368,7 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
     await salvarDB();
     alert(`🗑️ Registro salvo. Você teve um custo (perda) de ${fmtDinheiro(custoTotalPerda)} nesta operação.`);
     document.getElementById('form-descarte').reset();
-    atualizarSelectsDinamicos(); // Atualiza a quantidade que mostra no select
+    atualizarSelectsDinamicos(); 
 });
 
 // ==========================================
