@@ -5,7 +5,7 @@ const fmtNum = (v) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maxi
 // --- ESTADO DO BANCO DE DADOS ---
 let DB = {
     filamentos: [], extras: [], receitas: [],
-    estoqueProntos: [], historicoProducao: [], historicoVendas: []
+    estoqueProntos: [], historicoProducao: [], historicoVendas: [], historicoPerdas: []
 };
 let simulacaoAtual = null;
 
@@ -23,7 +23,7 @@ async function iniciarNuvem() {
             localStorage.setItem('gist_id', GIST_ID);
         } else {
             alert("Modo offline ativado (dados não serão sincronizados). Recarregue a página para configurar a nuvem.");
-            iniciarApp(); // Fallback para offline se cancelar
+            iniciarApp(); 
             return;
         }
     }
@@ -41,18 +41,18 @@ async function iniciarNuvem() {
         
         if (content && content !== "{}") {
             const cloudDB = JSON.parse(content);
-            // Sincroniza a memória com o que veio da nuvem
             DB.filamentos = cloudDB.filamentos || [];
             DB.extras = cloudDB.extras || [];
             DB.receitas = cloudDB.receitas || [];
             DB.estoqueProntos = cloudDB.estoqueProntos || [];
             DB.historicoProducao = cloudDB.historicoProducao || [];
             DB.historicoVendas = cloudDB.historicoVendas || [];
+            DB.historicoPerdas = cloudDB.historicoPerdas || []; // Nova linha
         }
 
         document.title = "Gestão 3D Pro - ERP (Nuvem ☁️)";
         console.log("Sincronização concluída com sucesso.");
-        iniciarApp(); // Dispara a interface
+        iniciarApp(); 
         
     } catch (error) {
         alert("Erro de Conexão com o GitHub: " + error.message + "\n\nO sistema iniciará vazio. Limpe o cache do navegador se quiser reconfigurar as chaves.");
@@ -61,9 +61,7 @@ async function iniciarNuvem() {
     }
 }
 
-// Salva localmente (backup) e envia pra nuvem
 async function salvarDB() {
-    // Backup de segurança no navegador
     localStorage.setItem('db_backup', JSON.stringify(DB));
 
     if (GITHUB_TOKEN && GIST_ID) {
@@ -73,21 +71,13 @@ async function salvarDB() {
             
             await fetch(`https://api.github.com/gists/${GIST_ID}`, {
                 method: 'PATCH',
-                headers: {
-                    'Authorization': `token ${GITHUB_TOKEN}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    files: {
-                        'database.json': { content: JSON.stringify(DB) }
-                    }
-                })
+                headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ files: { 'database.json': { content: JSON.stringify(DB) } } })
             });
             document.title = btnOriginal;
-            console.log("☁️ Salvo na nuvem com sucesso!");
         } catch (e) {
             console.error("Falha ao salvar na nuvem:", e);
-            alert("⚠️ Atenção: Falha ao enviar para o GitHub. Verifique sua internet. O dado foi salvo apenas no backup local.");
+            alert("⚠️ Falha ao enviar para o GitHub. Salvo apenas no cache local.");
         }
     }
 }
@@ -102,7 +92,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         document.getElementById(tabId).classList.add('active');
         e.target.classList.add('active');
         
-        if(tabId === 'tab-calc') { atualizarFormularioCalculo(); atualizarSelectProducao(); }
+        if(tabId === 'tab-calc') { atualizarSelectsDinamicos(); atualizarSelectProducao(); }
         if(tabId === 'tab-inv') renderizarInventario();
         if(tabId === 'tab-vendas') renderizarAbaVendas();
         if(tabId === 'tab-hist') renderizarHistoricos();
@@ -169,9 +159,10 @@ async function apagarFil(id) { if(confirm("Apagar filamento?")) { DB.filamentos 
 async function apagarExt(id) { if(confirm("Apagar insumo?")) { DB.extras = DB.extras.filter(x => x.id !== id); await salvarDB(); renderizarInventario(); } }
 
 // ==========================================
-// ABA 1: PRODUTOS E PRODUÇÃO (Engenharia)
+// ABA 1: PRODUTOS, PRODUÇÃO E DESCARTES
 // ==========================================
-function atualizarFormularioCalculo() {
+function atualizarSelectsDinamicos() {
+    // 1. Popula Selects de Filamento do Cálculo (Cor 1 a 4)
     for(let i=1; i<=4; i++) {
         const selectFil = document.getElementById(`calc-filamento-${i}`);
         const valorAtual = selectFil.value;
@@ -182,6 +173,16 @@ function atualizarFormularioCalculo() {
         selectFil.value = valorAtual;
     }
 
+    // 2. Popula Select de Filamento do Descarte
+    const selectDesc = document.getElementById('desc-filamento');
+    const valorDescAtual = selectDesc.value;
+    selectDesc.innerHTML = '<option value="">Selecione no Inventário...</option>';
+    DB.filamentos.forEach(f => {
+        const opt = document.createElement('option'); opt.value = f.id; opt.textContent = `${f.nome} (Disp: ${fmtNum(f.pesoRestante)}g)`; selectDesc.appendChild(opt);
+    });
+    selectDesc.value = valorDescAtual;
+
+    // 3. Popula Lista de Extras
     const listaExt = document.getElementById('calc-lista-extras');
     listaExt.innerHTML = '';
     DB.extras.forEach(x => {
@@ -267,7 +268,6 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     const receitaId = parseInt(document.getElementById('prod-receita').value);
     const qtdProduzir = parseInt(document.getElementById('prod-qtd').value);
     const receita = DB.receitas.find(r => r.id === receitaId);
-    
     if(!receita) return;
 
     for(let fUsado of receita.filamentosUsados) {
@@ -308,6 +308,46 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     await salvarDB();
     alert(`📦 Sucesso! ${qtdProduzir} unidade(s) de "${receita.nome}" fabricadas e adicionadas ao estoque pronto.`);
     document.getElementById('form-producao').reset();
+});
+
+// Registrar Descarte/Teste
+document.getElementById('form-descarte').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const tipo = document.getElementById('desc-tipo').value;
+    const filId = parseInt(document.getElementById('desc-filamento').value);
+    const peso = parseFloat(document.getElementById('desc-peso').value);
+    const horas = parseFloat(document.getElementById('desc-horas').value) || 0;
+    const min = parseFloat(document.getElementById('desc-min').value) || 0;
+    const motivo = document.getElementById('desc-motivo').value || 'Não informado';
+
+    const fil = DB.filamentos.find(f => f.id === filId);
+    if(!fil || peso > fil.pesoRestante) {
+        alert("Quantidade gasta maior do que o estoque disponível do filamento selecionado.");
+        return;
+    }
+
+    // Pega as configurações de energia do painel principal para calcular o desperdício
+    const kw = parseFloat(document.getElementById('calc-kw').value) || 0.15;
+    const kwh = parseFloat(document.getElementById('calc-preco-kwh').value) || 0.95;
+
+    const custoMaterial = peso * fil.custoPorGrama;
+    const custoEletrico = (horas + (min / 60)) * kw * kwh;
+    const custoTotalPerda = custoMaterial + custoEletrico;
+
+    // Baixa do Estoque
+    fil.pesoRestante -= peso;
+
+    // Salvar Perda
+    DB.historicoPerdas.push({
+        id: Date.now(), data: new Date().toLocaleDateString('pt-BR', {hour: '2-digit', minute:'2-digit'}),
+        tipo: tipo, filamentoNome: fil.nome, pesoGasto: peso, 
+        tempoGasto: `${horas}h ${min}m`, custoTotal: custoTotalPerda, motivo: motivo
+    });
+
+    await salvarDB();
+    alert(`🗑️ Registro salvo. Você teve um custo (perda) de ${fmtDinheiro(custoTotalPerda)} nesta operação.`);
+    document.getElementById('form-descarte').reset();
+    atualizarSelectsDinamicos(); // Atualiza a quantidade que mostra no select
 });
 
 // ==========================================
@@ -444,13 +484,32 @@ function renderizarHistoricos() {
                 </div>
             </div>`;
     });
+
+    const elPerdas = document.getElementById('lista-historico-perdas');
+    elPerdas.innerHTML = '';
+    if(!DB.historicoPerdas || DB.historicoPerdas.length === 0) elPerdas.innerHTML = '<p class="ajuda">Nenhum descarte ou teste registrado.</p>';
+
+    [...(DB.historicoPerdas || [])].reverse().forEach(p => {
+        elPerdas.innerHTML += `
+            <div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--warning);">
+                <div class="flex-between">
+                    <strong style="color: var(--text-main);">${p.tipo}: ${p.pesoGasto}g de ${p.filamentoNome}</strong>
+                    <span class="badge">${p.data}</span>
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
+                    Tempo perdido: <strong>${p.tempoGasto}</strong> | Motivo: <strong>${p.motivo}</strong>
+                </div>
+                <div class="res-row destaque" style="border:none; padding:0; margin-top:0.3rem;">
+                    <span style="font-size: 0.9rem; color: var(--text-muted);">Custo da Perda (Material + Eletricidade):</span>
+                    <strong class="text-danger">-${fmtDinheiro(p.custoTotal)}</strong>
+                </div>
+            </div>`;
+    });
 }
 
-// Inicialização segura para garantir as chamadas do DOM
 function iniciarApp() {
-    atualizarFormularioCalculo();
+    atualizarSelectsDinamicos();
     atualizarSelectProducao();
 }
 
-// Dispara o boot pela nuvem ao invés de abrir o HTML solto
 document.addEventListener('DOMContentLoaded', iniciarNuvem);

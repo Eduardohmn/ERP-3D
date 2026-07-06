@@ -157,7 +157,7 @@
                     </fieldset>
 
                     <fieldset>
-                        <legend>Energia Elétrica</legend>
+                        <legend>Energia Elétrica (Padrão da Impressora)</legend>
                         <div class="form-row">
                             <div class="form-col">
                                 <label>Tempo (Horas):</label>
@@ -227,6 +227,50 @@
                     <button type="submit" class="btn-success">📦 Fabricar Peça(s)</button>
                 </form>
             </div>
+
+            <hr>
+            <div class="card" style="border-color: var(--warning);">
+                <h2 style="color: var(--warning);">3. Registro de Descarte e Testes</h2>
+                <p class="ajuda">Registre peças falhas ou calibrações. O material será descontado e o custo irá para as perdas.</p>
+                <form id="form-descarte">
+                    <div class="form-row">
+                        <div class="form-col">
+                            <label>Tipo de Registro:</label>
+                            <select id="desc-tipo" required>
+                                <option value="Teste">Peça Teste / Calibração</option>
+                                <option value="Descarte">Falha / Descarte</option>
+                            </select>
+                        </div>
+                        <div class="form-col" style="flex: 2;">
+                            <label>Filamento Desperdiçado:</label>
+                            <select id="desc-filamento" required>
+                                <option value="">Selecione no Inventário...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-col">
+                            <label>Peso Gasto (g):</label>
+                            <input type="number" id="desc-peso" step="0.1" required>
+                        </div>
+                        <div class="form-col">
+                            <label>Tempo Perdido (Horas):</label>
+                            <input type="number" id="desc-horas" min="0" value="0" required>
+                        </div>
+                        <div class="form-col">
+                            <label>Tempo Perdido (Min):</label>
+                            <input type="number" id="desc-min" min="0" max="59" value="0" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-col">
+                            <label>Motivo / Detalhes (Opcional):</label>
+                            <input type="text" id="desc-motivo" placeholder="Ex: Cubo de calibração Ender 3 ou falha de aderência no PLA">
+                        </div>
+                    </div>
+                    <button type="submit" style="background-color: var(--warning); color: #000;">🗑️ Registrar Baixa por Perda/Teste</button>
+                </form>
+            </div>
         </div>
 
         <div id="tab-vendas" class="tab-content">
@@ -284,15 +328,18 @@
             <h1>Histórico Financeiro e Operacional</h1>
             
             <div class="card card-alt" style="margin-bottom: 2rem;">
-                <h3 style="color: var(--success);">📈 Histórico de Vendas (Receita)</h3>
-                <div id="lista-historico-vendas" style="display: flex; flex-direction: column; gap: 1rem;">
-                    </div>
+                <h3 style="color: var(--success);">📈 Histórico de Vendas (Lucro)</h3>
+                <div id="lista-historico-vendas" style="display: flex; flex-direction: column; gap: 1rem;"></div>
             </div>
 
-            <div class="card card-alt">
+            <div class="card card-alt" style="margin-bottom: 2rem;">
                 <h3 style="color: var(--primary);">⚙️ Histórico de Produção (Fábrica)</h3>
-                <div id="lista-historico-producao" style="display: flex; flex-direction: column; gap: 1rem;">
-                    </div>
+                <div id="lista-historico-producao" style="display: flex; flex-direction: column; gap: 1rem;"></div>
+            </div>
+
+            <div class="card card-alt" style="border-left: 4px solid var(--warning);">
+                <h3 style="color: var(--warning);">🗑️ Histórico de Descartes e Testes (Perdas)</h3>
+                <div id="lista-historico-perdas" style="display: flex; flex-direction: column; gap: 1rem;"></div>
             </div>
         </div>
 
