@@ -15,7 +15,6 @@ let GIST_ID = localStorage.getItem('gist_id');
 
 async function iniciarNuvem() {
     if (!GITHUB_TOKEN || !GIST_ID) {
-        // Agora pede tudo em um único campo
         const inputDados = prompt(
             "☁️ Bem-vindo ao ERP em Nuvem!\n\n" +
             "Cole aqui as DUAS CHAVES juntas (pode ter espaço ou estar tudo colado).\n\n" +
@@ -23,13 +22,10 @@ async function iniciarNuvem() {
         );
         
         if (inputDados) {
-            // Usa Regex para caçar o Token do GitHub (que sempre começa com ghp_)
             const tokenMatch = inputDados.match(/(ghp_[a-zA-Z0-9]+)/);
             
             if (tokenMatch) {
                 GITHUB_TOKEN = tokenMatch[1];
-                
-                // O Gist ID é o que sobrar depois de retirar o Token e limpar caracteres especiais/espaços
                 GIST_ID = inputDados.replace(GITHUB_TOKEN, '').replace(/[^a-zA-Z0-9]/g, '').trim();
                 
                 if (GIST_ID.length > 0) {
@@ -153,7 +149,13 @@ function renderizarInventario() {
         let cor = perc <= 15 ? 'stock-low' : (perc <= 50 ? 'stock-warn' : 'stock-good');
         elFil.innerHTML += `
             <div class="item-card">
-                <div class="item-title">${f.nome} <button type="button" class="btn-danger btn-small" onclick="apagarFil(${f.id})">X</button></div>
+                <div class="item-title">
+                    ${f.nome} 
+                    <div style="display:flex; gap:0.3rem;">
+                        <button type="button" class="btn-small" style="background-color: var(--warning); color: #000; border: none; border-radius: 4px; cursor: pointer;" onclick="editarFil(${f.id})" title="Ajustar Peso Restante">✏️</button>
+                        <button type="button" class="btn-danger btn-small" style="border: none; border-radius: 4px; cursor: pointer;" onclick="apagarFil(${f.id})" title="Apagar Filamento">X</button>
+                    </div>
+                </div>
                 <div class="item-details">
                     <span>Custo: ${fmtDinheiro(f.custoPorGrama)} / g</span>
                     <span style="font-weight: bold;">Resta: ${fmtNum(f.pesoRestante)}g</span>
@@ -170,7 +172,13 @@ function renderizarInventario() {
         const sigla = x.medida === 'Unidades' ? 'un' : x.medida;
         elExt.innerHTML += `
             <div class="item-card">
-                <div class="item-title">${x.nome} <button type="button" class="btn-danger btn-small" onclick="apagarExt(${x.id})">X</button></div>
+                <div class="item-title">
+                    ${x.nome} 
+                    <div style="display:flex; gap:0.3rem;">
+                        <button type="button" class="btn-small" style="background-color: var(--warning); color: #000; border: none; border-radius: 4px; cursor: pointer;" onclick="editarExt(${x.id})" title="Ajustar Quantidade">✏️</button>
+                        <button type="button" class="btn-danger btn-small" style="border: none; border-radius: 4px; cursor: pointer;" onclick="apagarExt(${x.id})" title="Apagar Insumo">X</button>
+                    </div>
+                </div>
                 <div class="item-details">
                     <span>Custo: ${fmtDinheiro(x.custoUnitario)} / ${sigla}</span>
                     <span style="font-weight: bold;">Resta: ${fmtNum(x.qtdRestante)} ${sigla}</span>
@@ -179,6 +187,56 @@ function renderizarInventario() {
             </div>`;
     });
 }
+
+// Funções de Edição (Ajuste de Estoque Manual)
+async function editarFil(id) {
+    const fil = DB.filamentos.find(f => f.id === id);
+    if(!fil) return;
+    
+    const novoPeso = prompt(`✏️ AJUSTE DE ESTOQUE\n\nFilamento: ${fil.nome}\nPeso Atual: ${fmtNum(fil.pesoRestante)}g\n\nDigite quantas gramas restam agora:`, fil.pesoRestante);
+    
+    if (novoPeso !== null && novoPeso.trim() !== "") {
+        const pesoNumerico = parseFloat(novoPeso.replace(',', '.'));
+        if (!isNaN(pesoNumerico) && pesoNumerico >= 0) {
+            fil.pesoRestante = pesoNumerico;
+            // Se colocar um peso maior que o inicial, ajusta o inicial para a barra não passar de 100%
+            if (fil.pesoRestante > fil.pesoInicial) {
+                fil.pesoInicial = fil.pesoRestante;
+                fil.custoPorGrama = fil.precoTotal / fil.pesoInicial; 
+            }
+            await salvarDB();
+            renderizarInventario();
+            atualizarSelectsDinamicos();
+        } else {
+            alert("Valor inválido. Digite apenas números.");
+        }
+    }
+}
+
+async function editarExt(id) {
+    const ext = DB.extras.find(e => e.id === id);
+    if(!ext) return;
+    
+    const sigla = ext.medida === 'Unidades' ? 'un' : ext.medida;
+    const novaQtd = prompt(`✏️ AJUSTE DE ESTOQUE\n\nInsumo: ${ext.nome}\nQuantidade Atual: ${fmtNum(ext.qtdRestante)} ${sigla}\n\nDigite quanto resta agora:`, ext.qtdRestante);
+    
+    if (novaQtd !== null && novaQtd.trim() !== "") {
+        const qtdNumerica = parseFloat(novaQtd.replace(',', '.'));
+        if (!isNaN(qtdNumerica) && qtdNumerica >= 0) {
+            ext.qtdRestante = qtdNumerica;
+            if (ext.qtdRestante > ext.qtdInicial) {
+                ext.qtdInicial = ext.qtdRestante;
+                ext.custoUnitario = ext.precoTotal / ext.qtdInicial; 
+            }
+            await salvarDB();
+            renderizarInventario();
+            atualizarSelectsDinamicos();
+        } else {
+            alert("Valor inválido. Digite apenas números.");
+        }
+    }
+}
+
 async function apagarFil(id) { if(confirm("Apagar filamento?")) { DB.filamentos = DB.filamentos.filter(f => f.id !== id); await salvarDB(); renderizarInventario(); } }
 async function apagarExt(id) { if(confirm("Apagar insumo?")) { DB.extras = DB.extras.filter(x => x.id !== id); await salvarDB(); renderizarInventario(); } }
 
@@ -186,9 +244,9 @@ async function apagarExt(id) { if(confirm("Apagar insumo?")) { DB.extras = DB.ex
 // ABA 1: PRODUTOS, PRODUÇÃO E DESCARTES
 // ==========================================
 function atualizarSelectsDinamicos() {
-    // 1. Popula Selects de Filamento do Cálculo (Cor 1 a 4)
     for(let i=1; i<=4; i++) {
         const selectFil = document.getElementById(`calc-filamento-${i}`);
+        if(!selectFil) continue;
         const valorAtual = selectFil.value;
         selectFil.innerHTML = i === 1 ? '<option value="">Selecione no Inventário...</option>' : '<option value="">Nenhum...</option>';
         DB.filamentos.forEach(f => {
@@ -197,29 +255,31 @@ function atualizarSelectsDinamicos() {
         selectFil.value = valorAtual;
     }
 
-    // 2. Popula Select de Filamento do Descarte
     const selectDesc = document.getElementById('desc-filamento');
-    const valorDescAtual = selectDesc.value;
-    selectDesc.innerHTML = '<option value="">Selecione no Inventário...</option>';
-    DB.filamentos.forEach(f => {
-        const opt = document.createElement('option'); opt.value = f.id; opt.textContent = `${f.nome} (Disp: ${fmtNum(f.pesoRestante)}g)`; selectDesc.appendChild(opt);
-    });
-    selectDesc.value = valorDescAtual;
+    if(selectDesc) {
+        const valorDescAtual = selectDesc.value;
+        selectDesc.innerHTML = '<option value="">Selecione no Inventário...</option>';
+        DB.filamentos.forEach(f => {
+            const opt = document.createElement('option'); opt.value = f.id; opt.textContent = `${f.nome} (Disp: ${fmtNum(f.pesoRestante)}g)`; selectDesc.appendChild(opt);
+        });
+        selectDesc.value = valorDescAtual;
+    }
 
-    // 3. Popula Lista de Extras
     const listaExt = document.getElementById('calc-lista-extras');
-    listaExt.innerHTML = '';
-    DB.extras.forEach(x => {
-        const sigla = x.medida === 'Unidades' ? 'un' : x.medida;
-        listaExt.innerHTML += `
-            <div class="flex-between" style="background: var(--bg-input); padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border);">
-                <div><strong>${x.nome}</strong> <span style="font-size: 0.8rem; color: var(--text-muted)">(${fmtDinheiro(x.custoUnitario)}/${sigla})</span></div>
-                <div style="display:flex; align-items:center; gap:0.5rem;">
-                    <input type="number" class="calc-ext-uso" data-id="${x.id}" min="0" step="0.01" placeholder="0" style="width: 80px; padding: 0.4rem;">
-                    <span>${sigla}</span>
-                </div>
-            </div>`;
-    });
+    if(listaExt) {
+        listaExt.innerHTML = '';
+        DB.extras.forEach(x => {
+            const sigla = x.medida === 'Unidades' ? 'un' : x.medida;
+            listaExt.innerHTML += `
+                <div class="flex-between" style="background: var(--bg-input); padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border);">
+                    <div><strong>${x.nome}</strong> <span style="font-size: 0.8rem; color: var(--text-muted)">(${fmtDinheiro(x.custoUnitario)}/${sigla})</span></div>
+                    <div style="display:flex; align-items:center; gap:0.5rem;">
+                        <input type="number" class="calc-ext-uso" data-id="${x.id}" min="0" step="0.01" placeholder="0" style="width: 80px; padding: 0.4rem;">
+                        <span>${sigla}</span>
+                    </div>
+                </div>`;
+        });
+    }
 }
 
 document.getElementById('form-calc').addEventListener('submit', (e) => {
@@ -281,6 +341,7 @@ document.getElementById('btn-salvar-receita').addEventListener('click', async ()
 
 function atualizarSelectProducao() {
     const sel = document.getElementById('prod-receita');
+    if(!sel) return;
     sel.innerHTML = '<option value="">Selecione um produto salvo...</option>';
     DB.receitas.forEach(r => {
         const opt = document.createElement('option'); opt.value = r.id; opt.textContent = `${r.nome} (Custo Médio: ${fmtDinheiro(r.custoTotal)})`; sel.appendChild(opt);
@@ -332,6 +393,7 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     await salvarDB();
     alert(`📦 Sucesso! ${qtdProduzir} unidade(s) de "${receita.nome}" fabricadas e adicionadas ao estoque pronto.`);
     document.getElementById('form-producao').reset();
+    atualizarSelectsDinamicos();
 });
 
 // Registrar Descarte/Teste
