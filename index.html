@@ -11,16 +11,17 @@
     <!-- NAVEGAÇÃO -->
     <nav class="tabs-nav">
         <button class="tab-btn active" data-tab="tab-calc">1. Simulações</button>
-        <button class="tab-btn" data-tab="tab-fabrica">2. Fábrica & Descartes</button>
-        <button class="tab-btn" data-tab="tab-inv">3. Inventário</button>
-        <button class="tab-btn" data-tab="tab-vendas">4. Vendas</button>
-        <button class="tab-btn" data-tab="tab-hist">5. Histórico</button>
+        <button class="tab-btn" data-tab="tab-catalogo">2. Catálogo Salvo</button>
+        <button class="tab-btn" data-tab="tab-fabrica">3. Fábrica & Descartes</button>
+        <button class="tab-btn" data-tab="tab-inv">4. Inventário</button>
+        <button class="tab-btn" data-tab="tab-vendas">5. Vendas</button>
+        <button class="tab-btn" data-tab="tab-hist">6. Histórico</button>
     </nav>
 
     <div class="container">
         
         <!-- ========================================== -->
-        <!-- ABA 1: SIMULAÇÕES E CATÁLOGO -->
+        <!-- ABA 1: SIMULAÇÕES E ORÇAMENTOS -->
         <!-- ========================================== -->
         <div id="tab-calc" class="tab-content active">
             <h1>Simulação de Custos e Preços</h1>
@@ -124,7 +125,7 @@
                     <button type="submit" style="width: 100%;">💡 Simular Custos</button>
                 </form>
 
-                <!-- PAINEL DE RESULTADO DETALHADO E SALVAMENTO -->
+                <!-- PAINEL DE RESULTADO DETALHADO -->
                 <div id="painel-resultados" class="card-alt" style="display: none; padding: 1.5rem; border-radius: 8px; margin-top: 1.5rem; border: 1px solid var(--border);">
                     <h2>Análise Financeira</h2>
                     <div class="res-row">
@@ -174,13 +175,30 @@
                         <div id="alerta-shopee" style="display: none;" class="alert-box"></div>
                     </div>
                     
-                    <button type="button" id="btn-salvar-receita" class="btn-primary" style="width: 100%; margin-top: 1.5rem;">💾 Salvar Receita no Catálogo</button>
+                    <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
+                        <button type="button" id="btn-salvar-receita" class="btn-primary" style="flex: 2;">💾 Salvar Receita no Catálogo</button>
+                        <button type="button" id="btn-cancelar-edicao" class="btn-danger" style="flex: 1; display: none;">❌ Cancelar</button>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- ========================================== -->
-        <!-- ABA 2: FÁBRICA E DESCARTES -->
+        <!-- ABA 2: CATÁLOGO DE PRODUTOS SALVOS -->
+        <!-- ========================================== -->
+        <div id="tab-catalogo" class="tab-content">
+            <h1>Catálogo de Receitas</h1>
+            <p class="ajuda">Gerencie os projetos que você orçou e salvou. Edite custos antigos ou exclua projetos descontinuados.</p>
+            
+            <div class="card card-alt">
+                <div id="lista-catalogo" class="grid-list">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- ABA 3: FÁBRICA E DESCARTES -->
         <!-- ========================================== -->
         <div id="tab-fabrica" class="tab-content">
             <h1>Chão de Fábrica</h1>
@@ -193,7 +211,7 @@
                         <div class="form-col" style="flex: 3;">
                             <label>Escolha o Projeto (Receita):</label>
                             <select id="prod-receita" required>
-                                <option value="">Selecione um produto salvo...</option>
+                                <option value="">Selecione um produto salvo no catálogo...</option>
                             </select>
                         </div>
                         <div class="form-col" style="flex: 1;">
@@ -245,7 +263,7 @@
                             <input type="text" id="desc-motivo" placeholder="Ex: Falha de aderência">
                         </div>
                     </div>
-                    <!-- Inputs ocultos para cálculo da perda elétrica baseado no padrão da impressora -->
+                    <!-- Inputs ocultos para cálculo da perda elétrica -->
                     <input type="hidden" id="desc-kw" value="0.15">
                     <input type="hidden" id="desc-preco-kwh" value="0.95">
                     
@@ -255,7 +273,7 @@
         </div>
 
         <!-- ========================================== -->
-        <!-- ABA 3: INVENTÁRIO -->
+        <!-- ABA 4: INVENTÁRIO -->
         <!-- ========================================== -->
         <div id="tab-inv" class="tab-content">
             <h1>Inventário de Matéria-Prima</h1>
@@ -326,7 +344,7 @@
         </div>
 
         <!-- ========================================== -->
-        <!-- ABA 4: VENDAS E ESTOQUE PRONTO -->
+        <!-- ABA 5: VENDAS E ESTOQUE PRONTO -->
         <!-- ========================================== -->
         <div id="tab-vendas" class="tab-content">
             <h1>Estoque Pronto & Vendas</h1>
@@ -378,7 +396,7 @@
         </div>
 
         <!-- ========================================== -->
-        <!-- ABA 5: HISTÓRICO GERAL -->
+        <!-- ABA 6: HISTÓRICO GERAL -->
         <!-- ========================================== -->
         <div id="tab-hist" class="tab-content">
             <h1>Relatórios</h1>

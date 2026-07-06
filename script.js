@@ -8,6 +8,7 @@ let DB = {
     estoqueProntos: [], historicoProducao: [], historicoVendas: [], historicoPerdas: []
 };
 let simulacaoAtual = null;
+let editandoReceitaId = null; // Controle para edição do catálogo
 
 // --- INTEGRAÇÃO COM GITHUB GISTS ---
 let GITHUB_TOKEN = localStorage.getItem('github_token');
@@ -97,6 +98,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         e.target.classList.add('active');
         
         if(tabId === 'tab-calc') { atualizarSelectsDinamicos(); }
+        if(tabId === 'tab-catalogo') { renderizarCatalogo(); }
         if(tabId === 'tab-fabrica') { atualizarSelectsDinamicos(); atualizarSelectProducao(); }
         if(tabId === 'tab-inv') renderizarInventario();
         if(tabId === 'tab-vendas') renderizarAbaVendas();
@@ -105,7 +107,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 });
 
 // ==========================================
-// INVENTÁRIO (ABA 3)
+// ABA 4: INVENTÁRIO INSUMOS
 // ==========================================
 document.getElementById('form-filamento').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -206,7 +208,7 @@ async function apagarExt(id) { if(confirm("Apagar insumo?")) { DB.extras = DB.ex
 
 
 // ==========================================
-// DADOS DINÂMICOS (Puxa para Aba 1 e 2)
+// DADOS DINÂMICOS (Puxa para Abas de Simulação e Fábrica)
 // ==========================================
 function atualizarSelectsDinamicos() {
     for(let i=1; i<=4; i++) {
@@ -249,7 +251,7 @@ function atualizarSelectsDinamicos() {
 }
 
 // ==========================================
-// ABA 1: SIMULAÇÃO E CATÁLOGO
+// ABA 1: SIMULAÇÃO DE CUSTOS
 // ==========================================
 document.getElementById('form-calc').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -288,37 +290,40 @@ document.getElementById('form-calc').addEventListener('submit', (e) => {
 
     const custoTotal = custoFil + custoEne + custoMan + custoExt;
     
-    // Markups baseados nas versões detalhadas solicitadas
     const m3 = custoTotal * 3;
     const m5 = custoTotal * 5;
     const shopeeM3 = (m3 + 4) / 0.8;
     const shopeeM5 = (m5 + 4) / 0.8;
 
-    // Custos Básicos
     document.getElementById('res-custo-fil').textContent = fmtDinheiro(custoFil);
     document.getElementById('res-custo-ener').textContent = fmtDinheiro(custoEne + custoMan);
     document.getElementById('res-custo-ext').textContent = fmtDinheiro(custoExt);
     document.getElementById('res-custo-total').textContent = fmtDinheiro(custoTotal);
     
-    // Lucros de Venda Direta
     document.getElementById('res-m3').textContent = fmtDinheiro(m3);
     document.getElementById('lucro-m3').textContent = `Lucro Líquido: ${fmtDinheiro(m3 - custoTotal)}`;
     document.getElementById('res-m5').textContent = fmtDinheiro(m5);
     document.getElementById('lucro-m5').textContent = `Lucro Líquido: ${fmtDinheiro(m5 - custoTotal)}`;
     
-    // Shopee
     document.getElementById('res-shopee-m3').textContent = fmtDinheiro(shopeeM3);
     document.getElementById('res-shopee-m5').textContent = fmtDinheiro(shopeeM5);
 
-    // Configura o Simulador Dinâmico Shopee
     document.getElementById('sim-shopee-preco').value = shopeeM5.toFixed(2);
     
-    simulacaoAtual = { id: Date.now(), nome: nomeProduto, custoTotal, filamentosUsados, extrasUsados };
+    // Armazena com os dados brutos salvos para recarregar caso queira editar depois
+    simulacaoAtual = { 
+        id: editandoReceitaId || Date.now(), // Mantém o ID se estiver editando
+        nome: nomeProduto, 
+        custoTotal, 
+        filamentosUsados, 
+        extrasUsados,
+        params: { h, m, kw, precoKwh }
+    };
+
     atualizarSimulacaoShopee(shopeeM5, custoTotal);
     document.getElementById('painel-resultados').style.display = 'block';
 });
 
-// Simulador Dinâmico Shopee
 document.getElementById('sim-shopee-preco').addEventListener('input', (e) => {
     if(simulacaoAtual) atualizarSimulacaoShopee(parseFloat(e.target.value), simulacaoAtual.custoTotal);
 });
@@ -358,21 +363,133 @@ function atualizarSimulacaoShopee(precoVenda, custo) {
 
 document.getElementById('btn-salvar-receita').addEventListener('click', async () => {
     if(!simulacaoAtual) return;
-    DB.receitas.push(simulacaoAtual);
+    
+    if (editandoReceitaId) {
+        const index = DB.receitas.findIndex(r => r.id === editandoReceitaId);
+        if (index !== -1) DB.receitas[index] = simulacaoAtual;
+        alert(`Receita "${simulacaoAtual.nome}" atualizada com sucesso!`);
+    } else {
+        DB.receitas.push(simulacaoAtual);
+        alert(`Receita "${simulacaoAtual.nome}" salva no Catálogo!`);
+    }
+
     await salvarDB();
-    alert(`Receita "${simulacaoAtual.nome}" salva no Catálogo! Vá até a Aba 2 para produzir.`);
-    document.getElementById('painel-resultados').style.display = 'none';
-    document.getElementById('form-calc').reset();
-    simulacaoAtual = null;
+    resetarSimulacao();
 });
 
+document.getElementById('btn-cancelar-edicao').addEventListener('click', () => {
+    resetarSimulacao();
+});
+
+function resetarSimulacao() {
+    document.getElementById('painel-resultados').style.display = 'none';
+    document.getElementById('form-calc').reset();
+    document.getElementById('btn-salvar-receita').innerHTML = "💾 Salvar Receita no Catálogo";
+    document.getElementById('btn-cancelar-edicao').style.display = 'none';
+    simulacaoAtual = null;
+    editandoReceitaId = null;
+}
+
 // ==========================================
-// ABA 2: FÁBRICA (Produção e Descarte)
+// ABA 2: CATÁLOGO DE PRODUTOS SALVOS
+// ==========================================
+function renderizarCatalogo() {
+    const el = document.getElementById('lista-catalogo');
+    if(!el) return;
+    el.innerHTML = '';
+    
+    if(DB.receitas.length === 0) {
+        el.innerHTML = '<p class="ajuda">Nenhuma receita salva no catálogo.</p>';
+        return;
+    }
+    
+    DB.receitas.forEach(r => {
+        let filTxt = r.filamentosUsados.map(f => `${fmtNum(f.peso)}g de ${f.nome}`).join(', ');
+        let extTxt = r.extrasUsados && r.extrasUsados.length ? r.extrasUsados.map(ex => `${fmtNum(ex.qtd)}x ${ex.nome}`).join(', ') : 'Nenhum';
+        
+        el.innerHTML += `
+        <div class="item-card" style="border-left: 4px solid var(--primary);">
+            <div class="item-title">
+                ${r.nome}
+                <div style="display:flex; gap:0.3rem;">
+                    <button type="button" class="btn-small" style="background-color: var(--warning); color: #000; border: none; border-radius: 4px; cursor: pointer;" onclick="editarReceita(${r.id})" title="Editar Projeto">✏️</button>
+                    <button type="button" class="btn-danger btn-small" style="border: none; border-radius: 4px; cursor: pointer;" onclick="apagarReceita(${r.id})" title="Excluir do Catálogo">X</button>
+                </div>
+            </div>
+            <div class="item-details">
+                <span style="color: var(--primary); font-weight: bold;">Custo Base: ${fmtDinheiro(r.custoTotal)}</span>
+                <span style="font-size: 0.8rem; margin-top: 0.3rem;"><strong>Filamentos:</strong> ${filTxt}</span>
+                <span style="font-size: 0.8rem;"><strong>Insumos:</strong> ${extTxt}</span>
+            </div>
+        </div>`;
+    });
+}
+
+function editarReceita(id) {
+    const r = DB.receitas.find(x => x.id === id);
+    if(!r) return;
+    
+    // Volta para a aba de simulação
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById('tab-calc').classList.add('active');
+    document.querySelector('[data-tab="tab-calc"]').classList.add('active');
+    
+    document.getElementById('calc-nome').value = r.nome;
+    
+    // Limpa os campos
+    for(let i=1; i<=4; i++) {
+        document.getElementById(`calc-filamento-${i}`).value = "";
+        document.getElementById(`calc-peso-${i}`).value = "";
+    }
+    
+    // Preenche com os dados da receita
+    r.filamentosUsados.forEach((fUsado, index) => {
+        if(index < 4) {
+            const i = index + 1;
+            document.getElementById(`calc-filamento-${i}`).value = fUsado.id;
+            document.getElementById(`calc-peso-${i}`).value = fUsado.peso;
+        }
+    });
+    
+    if(r.params) {
+        document.getElementById('calc-horas').value = r.params.h || 0;
+        document.getElementById('calc-minutos').value = r.params.m || 0;
+        document.getElementById('calc-kw').value = r.params.kw || 0.15;
+        document.getElementById('calc-preco-kwh').value = r.params.precoKwh || 0.95;
+    }
+    
+    document.querySelectorAll('.calc-ext-uso').forEach(input => input.value = "");
+    if(r.extrasUsados) {
+        r.extrasUsados.forEach(eUsado => {
+            const input = document.querySelector(`.calc-ext-uso[data-id="${eUsado.id}"]`);
+            if(input) input.value = eUsado.qtd;
+        });
+    }
+    
+    editandoReceitaId = r.id;
+    document.getElementById('btn-salvar-receita').innerHTML = "💾 Atualizar Receita no Catálogo";
+    document.getElementById('btn-cancelar-edicao').style.display = 'block';
+    
+    // Dispara a simulação para abrir o painel com os dados
+    document.getElementById('form-calc').dispatchEvent(new Event('submit'));
+}
+
+async function apagarReceita(id) {
+    if(confirm("Deseja realmente excluir esta receita do catálogo?\nIsso NÃO afeta peças que já estão prontas no estoque.")) {
+        DB.receitas = DB.receitas.filter(r => r.id !== id);
+        await salvarDB();
+        renderizarCatalogo();
+    }
+}
+
+// ==========================================
+// ABA 3: FÁBRICA (Produção e Descarte)
 // ==========================================
 function atualizarSelectProducao() {
     const sel = document.getElementById('prod-receita');
     if(!sel) return;
-    sel.innerHTML = '<option value="">Selecione um produto salvo...</option>';
+    sel.innerHTML = '<option value="">Selecione um produto salvo no catálogo...</option>';
     DB.receitas.forEach(r => {
         const opt = document.createElement('option'); opt.value = r.id; opt.textContent = `${r.nome} (Custo Base: ${fmtDinheiro(r.custoTotal)})`; sel.appendChild(opt);
     });
@@ -425,7 +542,7 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     });
 
     await salvarDB();
-    alert(`📦 ${qtdProduzir} unidade(s) de "${receita.nome}" produzida(s) com sucesso!\n\nFoi transferido para a aba Estoque Pronto.`);
+    alert(`📦 ${qtdProduzir} unidade(s) de "${receita.nome}" produzida(s) com sucesso!\n\nFoi transferido para a aba Vendas.`);
     document.getElementById('form-producao').reset();
     atualizarSelectsDinamicos();
 });
@@ -466,7 +583,7 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
 });
 
 // ==========================================
-// ABA 4: VENDAS
+// ABA 5: VENDAS
 // ==========================================
 function renderizarAbaVendas() {
     const elLista = document.getElementById('lista-estoque-prontos');
@@ -558,7 +675,7 @@ document.getElementById('form-venda').addEventListener('submit', async (e) => {
 });
 
 // ==========================================
-// ABA 5: HISTÓRICO
+// ABA 6: HISTÓRICO
 // ==========================================
 function renderizarHistoricos() {
     const elVendas = document.getElementById('lista-historico-vendas');
