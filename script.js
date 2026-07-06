@@ -2,25 +2,95 @@
 const fmtDinheiro = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
 const fmtNum = (v) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
-// --- ESTADO DO BANCO DE DADOS (LOCALSTORAGE) ---
+// --- ESTADO DO BANCO DE DADOS ---
 let DB = {
-    filamentos: JSON.parse(localStorage.getItem('db_filamentos')) || [],
-    extras: JSON.parse(localStorage.getItem('db_extras')) || [],
-    receitas: JSON.parse(localStorage.getItem('db_receitas')) || [],
-    estoqueProntos: JSON.parse(localStorage.getItem('db_estoque_prontos')) || [],
-    historicoProducao: JSON.parse(localStorage.getItem('db_hist_producao')) || [],
-    historicoVendas: JSON.parse(localStorage.getItem('db_hist_vendas')) || []
+    filamentos: [], extras: [], receitas: [],
+    estoqueProntos: [], historicoProducao: [], historicoVendas: []
 };
 let simulacaoAtual = null;
 
-const salvarDB = () => {
-    localStorage.setItem('db_filamentos', JSON.stringify(DB.filamentos));
-    localStorage.setItem('db_extras', JSON.stringify(DB.extras));
-    localStorage.setItem('db_receitas', JSON.stringify(DB.receitas));
-    localStorage.setItem('db_estoque_prontos', JSON.stringify(DB.estoqueProntos));
-    localStorage.setItem('db_hist_producao', JSON.stringify(DB.historicoProducao));
-    localStorage.setItem('db_hist_vendas', JSON.stringify(DB.historicoVendas));
-};
+// --- INTEGRAÇÃO COM GITHUB GISTS (NUVEM) ---
+let GITHUB_TOKEN = localStorage.getItem('github_token');
+let GIST_ID = localStorage.getItem('gist_id');
+
+async function iniciarNuvem() {
+    if (!GITHUB_TOKEN || !GIST_ID) {
+        GITHUB_TOKEN = prompt("☁️ Bem-vindo ao ERP em Nuvem!\n\nCole aqui o seu GITHUB PERSONAL ACCESS TOKEN (PAT):");
+        GIST_ID = prompt("Agora, cole aqui o ID numérico do seu Gist:");
+        
+        if(GITHUB_TOKEN && GIST_ID) {
+            localStorage.setItem('github_token', GITHUB_TOKEN);
+            localStorage.setItem('gist_id', GIST_ID);
+        } else {
+            alert("Modo offline ativado (dados não serão sincronizados). Recarregue a página para configurar a nuvem.");
+            iniciarApp(); // Fallback para offline se cancelar
+            return;
+        }
+    }
+
+    try {
+        document.title = "Sincronizando com a Nuvem...";
+        const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+            headers: { 'Authorization': `token ${GITHUB_TOKEN}` }
+        });
+
+        if (!response.ok) throw new Error("Credenciais inválidas ou Gist não encontrado.");
+
+        const data = await response.json();
+        const content = data.files['database.json'].content;
+        
+        if (content && content !== "{}") {
+            const cloudDB = JSON.parse(content);
+            // Sincroniza a memória com o que veio da nuvem
+            DB.filamentos = cloudDB.filamentos || [];
+            DB.extras = cloudDB.extras || [];
+            DB.receitas = cloudDB.receitas || [];
+            DB.estoqueProntos = cloudDB.estoqueProntos || [];
+            DB.historicoProducao = cloudDB.historicoProducao || [];
+            DB.historicoVendas = cloudDB.historicoVendas || [];
+        }
+
+        document.title = "Gestão 3D Pro - ERP (Nuvem ☁️)";
+        console.log("Sincronização concluída com sucesso.");
+        iniciarApp(); // Dispara a interface
+        
+    } catch (error) {
+        alert("Erro de Conexão com o GitHub: " + error.message + "\n\nO sistema iniciará vazio. Limpe o cache do navegador se quiser reconfigurar as chaves.");
+        document.title = "Gestão 3D Pro - ERP (Offline)";
+        iniciarApp();
+    }
+}
+
+// Salva localmente (backup) e envia pra nuvem
+async function salvarDB() {
+    // Backup de segurança no navegador
+    localStorage.setItem('db_backup', JSON.stringify(DB));
+
+    if (GITHUB_TOKEN && GIST_ID) {
+        try {
+            const btnOriginal = document.title;
+            document.title = "Salvando na Nuvem...";
+            
+            await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+                method: 'PATCH',
+                headers: {
+                    'Authorization': `token ${GITHUB_TOKEN}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    files: {
+                        'database.json': { content: JSON.stringify(DB) }
+                    }
+                })
+            });
+            document.title = btnOriginal;
+            console.log("☁️ Salvo na nuvem com sucesso!");
+        } catch (e) {
+            console.error("Falha ao salvar na nuvem:", e);
+            alert("⚠️ Atenção: Falha ao enviar para o GitHub. Verifique sua internet. O dado foi salvo apenas no backup local.");
+        }
+    }
+}
 
 // --- NAVEGAÇÃO DE ABAS ---
 document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -42,23 +112,23 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
 // ==========================================
 // ABA 2: INVENTÁRIO INSUMOS
 // ==========================================
-document.getElementById('form-filamento').addEventListener('submit', (e) => {
+document.getElementById('form-filamento').addEventListener('submit', async (e) => {
     e.preventDefault();
     const nome = document.getElementById('fil-nome').value;
     const peso = parseFloat(document.getElementById('fil-peso').value);
     const preco = parseFloat(document.getElementById('fil-preco').value);
     DB.filamentos.push({ id: Date.now(), nome, pesoInicial: peso, pesoRestante: peso, precoTotal: preco, custoPorGrama: preco / peso });
-    salvarDB(); document.getElementById('form-filamento').reset(); renderizarInventario();
+    await salvarDB(); document.getElementById('form-filamento').reset(); renderizarInventario();
 });
 
-document.getElementById('form-extra').addEventListener('submit', (e) => {
+document.getElementById('form-extra').addEventListener('submit', async (e) => {
     e.preventDefault();
     const nome = document.getElementById('ext-nome').value;
     const medida = document.getElementById('ext-medida').value;
     const qtd = parseFloat(document.getElementById('ext-qtd').value);
     const preco = parseFloat(document.getElementById('ext-preco').value);
     DB.extras.push({ id: Date.now(), nome, medida, qtdInicial: qtd, qtdRestante: qtd, precoTotal: preco, custoUnitario: preco / qtd });
-    salvarDB(); document.getElementById('form-extra').reset(); renderizarInventario();
+    await salvarDB(); document.getElementById('form-extra').reset(); renderizarInventario();
 });
 
 function renderizarInventario() {
@@ -95,8 +165,8 @@ function renderizarInventario() {
             </div>`;
     });
 }
-function apagarFil(id) { if(confirm("Apagar filamento?")) { DB.filamentos = DB.filamentos.filter(f => f.id !== id); salvarDB(); renderizarInventario(); } }
-function apagarExt(id) { if(confirm("Apagar insumo?")) { DB.extras = DB.extras.filter(x => x.id !== id); salvarDB(); renderizarInventario(); } }
+async function apagarFil(id) { if(confirm("Apagar filamento?")) { DB.filamentos = DB.filamentos.filter(f => f.id !== id); await salvarDB(); renderizarInventario(); } }
+async function apagarExt(id) { if(confirm("Apagar insumo?")) { DB.extras = DB.extras.filter(x => x.id !== id); await salvarDB(); renderizarInventario(); } }
 
 // ==========================================
 // ABA 1: PRODUTOS E PRODUÇÃO (Engenharia)
@@ -127,7 +197,6 @@ function atualizarFormularioCalculo() {
     });
 }
 
-// 1. Ação de Simular
 document.getElementById('form-calc').addEventListener('submit', (e) => {
     e.preventDefault();
     const nomeProduto = document.getElementById('calc-nome').value;
@@ -174,11 +243,10 @@ document.getElementById('form-calc').addEventListener('submit', (e) => {
     document.getElementById('painel-resultados').style.display = 'block';
 });
 
-// 2. Ação de Salvar Receita no Catálogo
-document.getElementById('btn-salvar-receita').addEventListener('click', () => {
+document.getElementById('btn-salvar-receita').addEventListener('click', async () => {
     if(!simulacaoAtual) return;
     DB.receitas.push(simulacaoAtual);
-    salvarDB();
+    await salvarDB();
     alert(`Receita "${simulacaoAtual.nome}" salva no Catálogo!`);
     document.getElementById('painel-resultados').style.display = 'none';
     document.getElementById('form-calc').reset();
@@ -194,8 +262,7 @@ function atualizarSelectProducao() {
     });
 }
 
-// 3. Ação de Registrar Produção (Fábrica)
-document.getElementById('form-producao').addEventListener('submit', (e) => {
+document.getElementById('form-producao').addEventListener('submit', async (e) => {
     e.preventDefault();
     const receitaId = parseInt(document.getElementById('prod-receita').value);
     const qtdProduzir = parseInt(document.getElementById('prod-qtd').value);
@@ -203,7 +270,6 @@ document.getElementById('form-producao').addEventListener('submit', (e) => {
     
     if(!receita) return;
 
-    // Checagem de Estoque
     for(let fUsado of receita.filamentosUsados) {
         const fil = DB.filamentos.find(f => f.id === fUsado.id);
         if(!fil || fil.pesoRestante < (fUsado.peso * qtdProduzir)) {
@@ -217,7 +283,6 @@ document.getElementById('form-producao').addEventListener('submit', (e) => {
         }
     }
 
-    // Baixa de Estoque
     receita.filamentosUsados.forEach(fUsado => {
         const fil = DB.filamentos.find(f => f.id === fUsado.id);
         fil.pesoRestante -= (fUsado.peso * qtdProduzir);
@@ -227,22 +292,20 @@ document.getElementById('form-producao').addEventListener('submit', (e) => {
         ext.qtdRestante -= (eUsado.qtd * qtdProduzir);
     });
 
-    // Subir Estoque de Produto Pronto
     let itemEstoque = DB.estoqueProntos.find(p => p.receitaId === receita.id);
     if(itemEstoque) {
         itemEstoque.quantidade += qtdProduzir;
-        itemEstoque.custoUnitario = receita.custoTotal; // Atualiza pro custo da última fornada
+        itemEstoque.custoUnitario = receita.custoTotal; 
     } else {
         DB.estoqueProntos.push({ id: Date.now(), receitaId: receita.id, nome: receita.nome, custoUnitario: receita.custoTotal, quantidade: qtdProduzir });
     }
 
-    // Registrar Histórico
     DB.historicoProducao.push({
         id: Date.now(), data: new Date().toLocaleDateString('pt-BR', {hour: '2-digit', minute:'2-digit'}),
         nomeProduto: receita.nome, quantidade: qtdProduzir, custoTotalFornada: receita.custoTotal * qtdProduzir
     });
 
-    salvarDB();
+    await salvarDB();
     alert(`📦 Sucesso! ${qtdProduzir} unidade(s) de "${receita.nome}" fabricadas e adicionadas ao estoque pronto.`);
     document.getElementById('form-producao').reset();
 });
@@ -251,7 +314,6 @@ document.getElementById('form-producao').addEventListener('submit', (e) => {
 // ABA 3: VENDAS E ESTOQUE PRONTO
 // ==========================================
 function renderizarAbaVendas() {
-    // Render Lista Estoque
     const elLista = document.getElementById('lista-estoque-prontos');
     elLista.innerHTML = '';
     if(DB.estoqueProntos.length === 0) elLista.innerHTML = '<p class="ajuda">Nenhum produto pronto no estoque.</p>';
@@ -267,7 +329,6 @@ function renderizarAbaVendas() {
             </div>`;
     });
 
-    // Popula Select Venda
     const selectVenda = document.getElementById('venda-produto');
     selectVenda.innerHTML = '<option value="">Selecione no estoque pronto...</option>';
     DB.estoqueProntos.forEach(p => {
@@ -277,7 +338,6 @@ function renderizarAbaVendas() {
     });
 }
 
-// Simulador Dinâmico de Lucro na Venda
 const calcularPrevVenda = () => {
     const prodId = parseInt(document.getElementById('venda-produto').value);
     const qtd = parseInt(document.getElementById('venda-qtd').value) || 0;
@@ -297,10 +357,7 @@ const calcularPrevVenda = () => {
     const receitaBruta = precoUni * qtd;
     let taxaTotal = 0;
 
-    if(canal === 'Shopee') {
-        // Shopee cobra 20% + R$ 4 por unidade vendida (na maioria dos casos)
-        taxaTotal = ((precoUni * 0.20) + 4) * qtd; 
-    }
+    if(canal === 'Shopee') { taxaTotal = ((precoUni * 0.20) + 4) * qtd; }
 
     const lucroLiquido = receitaBruta - custoTotalFornada - taxaTotal;
 
@@ -315,8 +372,7 @@ document.getElementById('venda-qtd').addEventListener('input', calcularPrevVenda
 document.getElementById('venda-canal').addEventListener('change', calcularPrevVenda);
 document.getElementById('venda-preco').addEventListener('input', calcularPrevVenda);
 
-// Registrar Venda
-document.getElementById('form-venda').addEventListener('submit', (e) => {
+document.getElementById('form-venda').addEventListener('submit', async (e) => {
     e.preventDefault();
     const prodId = parseInt(document.getElementById('venda-produto').value);
     const qtd = parseInt(document.getElementById('venda-qtd').value);
@@ -332,17 +388,15 @@ document.getElementById('form-venda').addEventListener('submit', (e) => {
     
     const lucro = (precoUni * qtd) - custoTotalFab - taxa;
 
-    // Baixar Produto Pronto
     produto.quantidade -= qtd;
     if(produto.quantidade === 0) { DB.estoqueProntos = DB.estoqueProntos.filter(p => p.id !== prodId); }
 
-    // Salvar Histórico de Vendas
     DB.historicoVendas.push({
         id: Date.now(), data: new Date().toLocaleDateString('pt-BR', {hour: '2-digit', minute:'2-digit'}),
         nomeProduto: produto.nome, quantidade: qtd, canal, precoVendaTotal: (precoUni * qtd), taxa, lucroLiquido: lucro
     });
 
-    salvarDB();
+    await salvarDB();
     alert(`💲 Venda registrada com sucesso! Lucro apurado: ${fmtDinheiro(lucro)}`);
     document.getElementById('form-venda').reset();
     calcularPrevVenda();
@@ -392,8 +446,11 @@ function renderizarHistoricos() {
     });
 }
 
-// Inicialização
-document.addEventListener('DOMContentLoaded', () => {
+// Inicialização segura para garantir as chamadas do DOM
+function iniciarApp() {
     atualizarFormularioCalculo();
     atualizarSelectProducao();
-});
+}
+
+// Dispara o boot pela nuvem ao invés de abrir o HTML solto
+document.addEventListener('DOMContentLoaded', iniciarNuvem);
