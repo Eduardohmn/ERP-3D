@@ -8,7 +8,6 @@
 </head>
 <body>
 
-    <!-- NAVEGAÇÃO -->
     <nav class="tabs-nav">
         <button class="tab-btn active" data-tab="tab-calc">1. Simulações</button>
         <button class="tab-btn" data-tab="tab-catalogo">2. Catálogo Salvo</button>
@@ -20,9 +19,6 @@
 
     <div class="container">
         
-        <!-- ========================================== -->
-        <!-- ABA 1: SIMULAÇÕES E ORÇAMENTOS -->
-        <!-- ========================================== -->
         <div id="tab-calc" class="tab-content active">
             <h1>Simulação de Custos e Preços</h1>
             <p class="ajuda">Faça o orçamento detalhado da peça. O estoque não será alterado aqui.</p>
@@ -118,14 +114,12 @@
                     <fieldset>
                         <legend>Insumos Extras</legend>
                         <div id="calc-lista-extras" style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
-                            <!-- Injetado via JS -->
-                        </div>
+                            </div>
                     </fieldset>
 
                     <button type="submit" style="width: 100%;">💡 Simular Custos</button>
                 </form>
 
-                <!-- PAINEL DE RESULTADO DETALHADO -->
                 <div id="painel-resultados" class="card-alt" style="display: none; padding: 1.5rem; border-radius: 8px; margin-top: 1.5rem; border: 1px solid var(--border);">
                     <h2>Análise Financeira</h2>
                     <div class="res-row">
@@ -183,29 +177,22 @@
             </div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- ABA 2: CATÁLOGO DE PRODUTOS SALVOS -->
-        <!-- ========================================== -->
         <div id="tab-catalogo" class="tab-content">
             <h1>Catálogo de Receitas</h1>
             <p class="ajuda">Gerencie os projetos que você orçou e salvou. Edite custos antigos ou exclua projetos descontinuados.</p>
             
             <div class="card card-alt">
                 <div id="lista-catalogo" class="grid-list">
-                    <!-- Preenchido via JS -->
-                </div>
+                    </div>
             </div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- ABA 3: FÁBRICA E DESCARTES -->
-        <!-- ========================================== -->
         <div id="tab-fabrica" class="tab-content">
             <h1>Chão de Fábrica</h1>
             <p class="ajuda">Registre a produção real e perdas para manter seu inventário atualizado.</p>
             
             <div class="card" style="border-color: var(--success);">
-                <h2 style="color: var(--success);">📦 Registrar Production Concluída</h2>
+                <h2 style="color: var(--success);">📦 Registrar Produção Concluída</h2>
                 <form id="form-producao">
                     <div class="form-row">
                         <div class="form-col" style="flex: 3;">
@@ -230,50 +217,61 @@
                 <form id="form-descarte">
                     <div class="form-row">
                         <div class="form-col">
-                            <label>Tipo:</label>
+                            <label>Tipo de Perda:</label>
                             <select id="desc-tipo" required>
                                 <option value="Teste">Teste / Calibração</option>
-                                <option value="Descarte">Falha / Descarte</option>
+                                <option value="Descarte">Falha / Descarte de Impressão</option>
+                                <option value="Insumo">Perda/Quebra de Insumo Extra</option>
                             </select>
                         </div>
                         <div class="form-col" style="flex: 2;">
-                            <label>Filamento Desperdiçado:</label>
-                            <select id="desc-filamento" required>
+                            <label>Material Desperdiçado:</label>
+                            <select id="desc-material" required>
                                 <option value="">Selecione no Inventário...</option>
                             </select>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-col">
-                            <label>Peso (g):</label>
-                            <input type="number" id="desc-peso" step="0.1" required>
+                            <label id="lbl-desc-qtd">Peso (g) ou Quantidade:</label>
+                            <input type="number" id="desc-peso" step="0.01" required>
                         </div>
-                        <div class="form-col">
+                        <div class="form-col desc-energia-group">
                             <label>Tempo Perdido (Horas):</label>
                             <input type="number" id="desc-horas" min="0" value="0" required>
                         </div>
-                        <div class="form-col">
+                        <div class="form-col desc-energia-group">
                             <label>Tempo Perdido (Min):</label>
                             <input type="number" id="desc-min" min="0" max="59" value="0" required>
                         </div>
                     </div>
+                    
+                    <fieldset class="desc-energia-group" style="padding: 0.8rem;">
+                        <legend>Energia Elétrica Desperdiçada</legend>
+                        <div class="form-row" style="margin-bottom: 0;">
+                            <div class="form-col">
+                                <label>Consumo (kW):</label>
+                                <input type="number" id="desc-kw" step="0.001" value="0.15" required>
+                            </div>
+                            <div class="form-col">
+                                <label>Preço kWh (R$):</label>
+                                <input type="number" id="desc-preco-kwh" step="0.01" value="0.95" required>
+                            </div>
+                        </div>
+                    </fieldset>
+
                     <div class="form-row">
                         <div class="form-col">
                             <label>Motivo (Opcional):</label>
-                            <input type="text" id="desc-motivo" placeholder="Ex: Falha de aderência">
+                            <input type="text" id="desc-motivo" placeholder="Ex: Falha de aderência ou LED queimado">
                         </div>
                     </div>
-                    <input type="hidden" id="desc-kw" value="0.15">
-                    <input type="hidden" id="desc-preco-kwh" value="0.95">
                     
-                    <button type="submit" style="background-color: var(--warning); color: #000;">Registrar Perda de Material</button>
+                    <button type="submit" style="background-color: var(--warning); color: #000;">Registrar Perda e Abater do Estoque</button>
                 </form>
             </div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- ABA 4: INVENTÁRIO -->
-        <!-- ========================================== -->
         <div id="tab-inv" class="tab-content">
             <h1>Inventário de Matéria-Prima</h1>
             
@@ -342,9 +340,6 @@
             </div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- ABA 5: VENDAS E ESTOQUE PRONTO -->
-        <!-- ========================================== -->
         <div id="tab-vendas" class="tab-content">
             <h1>Estoque Pronto & Vendas</h1>
             
@@ -384,7 +379,7 @@
                     </div>
 
                     <div id="prev-venda" style="background: var(--bg-input); padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border: 1px dashed var(--border);">
-                        <div class="res-row"><span>Custo de Fabricação Total:</span> <strong id="prev-custo">R$ 0,00</strong></div>
+                        <div class="res-row"><span>Custo de Fab. Unitário:</span> <strong id="prev-custo">R$ 0,00</strong></div>
                         <div class="res-row"><span>Taxas da Plataforma:</span> <strong id="prev-taxa" class="text-danger">R$ 0,00</strong></div>
                         <div class="res-row destaque"><span>LUCRO LÍQUIDO (Total):</span> <strong id="prev-lucro">R$ 0,00</strong></div>
                     </div>
@@ -394,16 +389,12 @@
             </div>
         </div>
 
-        <!-- ========================================== -->
-        <!-- ABA 6: HISTÓRICO GERAL -->
-        <!-- ========================================== -->
         <div id="tab-hist" class="tab-content">
             <h1>Painel Financeiro & Relatórios</h1>
             
-            <!-- CONTROLE DE CAIXA EM NUVEM -->
             <div class="card" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; background: #161616; border: 1px solid var(--border); margin-bottom: 2rem;">
                 <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);">
-                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">TOTAL ENTROU</span>
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">TOTAL ENTROU (LÍQUIDO)</span>
                     <h2 id="dash-entrou" class="text-success" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
                 </div>
                 <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);">
@@ -411,7 +402,7 @@
                     <h2 id="dash-saiu" class="text-danger" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
                 </div>
                 <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);">
-                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">LUCRO LÍQUIDO</span>
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">LUCRO REAL</span>
                     <h2 id="dash-lucro" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
                 </div>
                 <div style="text-align: center; padding: 0.5rem;">

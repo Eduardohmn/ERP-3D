@@ -116,13 +116,8 @@ document.getElementById('form-filamento').addEventListener('submit', async (e) =
     const nome = document.getElementById('fil-nome').value;
     const peso = parseFloat(document.getElementById('fil-peso').value);
     const preco = parseFloat(document.getElementById('fil-preco').value);
-    
-    // Cadastra material no inventário
     DB.filamentos.push({ id: Date.now(), nome, pesoInicial: peso, pesoRestante: peso, precoTotal: preco, custoPorGrama: preco / peso });
-    
-    // Lança automaticamente o custo de aquisição nos Gastos do ERP
     DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Compra: Rolo ${nome}`, valor: preco });
-    
     await salvarDB(); document.getElementById('form-filamento').reset(); renderizarInventario();
 });
 
@@ -132,13 +127,8 @@ document.getElementById('form-extra').addEventListener('submit', async (e) => {
     const medida = document.getElementById('ext-medida').value;
     const qtd = parseFloat(document.getElementById('ext-qtd').value);
     const preco = parseFloat(document.getElementById('ext-preco').value);
-    
-    // Cadastra acessório no inventário
     DB.extras.push({ id: Date.now(), nome, medida, qtdInicial: qtd, qtdRestante: qtd, precoTotal: preco, custoUnitario: preco / qtd });
-    
-    // Lança automaticamente o custo de aquisição nos Gastos do ERP
     DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Compra: Insumo ${nome}`, valor: preco });
-    
     await salvarDB(); document.getElementById('form-extra').reset(); renderizarInventario();
 });
 
@@ -217,13 +207,14 @@ async function editarExt(id) {
         }
     }
 }
-async function apagarFil(id) { if(confirm("Apagar filamento?")) { DB.filamentos = DB.filamentos.filter(f => f.id !== id); await salvarDB(); renderizarInventario(); } }
-async function apagarExt(id) { if(confirm("Apagar insumo?")) { DB.extras = DB.extras.filter(x => x.id !== id); await salvarDB(); renderizarInventario(); } }
+async function apagarFil(id) { if(confirm("Atenção! Apagar um material pode interferir nas Receitas antigas. Deseja excluir?")) { DB.filamentos = DB.filamentos.filter(f => f.id !== id); await salvarDB(); renderizarInventario(); } }
+async function apagarExt(id) { if(confirm("Atenção! Apagar um insumo pode interferir nas Receitas antigas. Deseja excluir?")) { DB.extras = DB.extras.filter(x => x.id !== id); await salvarDB(); renderizarInventario(); } }
 
 // ==========================================
 // CONFIGURAÇÃO DE COMPONENTES DINÂMICOS
 // ==========================================
 function atualizarSelectsDinamicos() {
+    // Calculadora Filamentos
     for(let i=1; i<=4; i++) {
         const selectFil = document.getElementById(`calc-filamento-${i}`);
         if(selectFil) {
@@ -236,16 +227,35 @@ function atualizarSelectsDinamicos() {
         }
     }
 
-    const selectDesc = document.getElementById('desc-filamento');
-    if(selectDesc) {
-        const valorDescAtual = selectDesc.value;
-        selectDesc.innerHTML = '<option value="">Selecione no Inventário...</option>';
-        DB.filamentos.forEach(f => {
-            const opt = document.createElement('option'); opt.value = f.id; opt.textContent = `${f.nome} (Disp: ${fmtNum(f.pesoRestante)}g)`; selectDesc.appendChild(opt);
-        });
-        selectDesc.value = valorDescAtual;
+    // Formulário de Descarte (Muda conforme o tipo selecionado)
+    const selectTipoDesc = document.getElementById('desc-tipo');
+    const selectDescMat = document.getElementById('desc-material');
+    const lblDescQtd = document.getElementById('lbl-desc-qtd');
+    
+    if(selectDescMat && selectTipoDesc) {
+        const valorDescAtual = selectDescMat.value;
+        selectDescMat.innerHTML = '<option value="">Selecione no Inventário...</option>';
+        
+        // Esconde os campos de energia se for descartar apenas Insumo Extra
+        const camposEnergia = document.querySelectorAll('.desc-energia-group');
+        
+        if(selectTipoDesc.value === 'Insumo') {
+            lblDescQtd.innerText = "Quantidade Perdida:";
+            camposEnergia.forEach(el => el.style.display = 'none');
+            DB.extras.forEach(x => {
+                const opt = document.createElement('option'); opt.value = x.id; opt.textContent = `${x.nome} (Disp: ${fmtNum(x.qtdRestante)})`; selectDescMat.appendChild(opt);
+            });
+        } else {
+            lblDescQtd.innerText = "Peso Perdido (g):";
+            camposEnergia.forEach(el => el.style.display = 'flex');
+            DB.filamentos.forEach(f => {
+                const opt = document.createElement('option'); opt.value = f.id; opt.textContent = `${f.nome} (Disp: ${fmtNum(f.pesoRestante)}g)`; selectDescMat.appendChild(opt);
+            });
+        }
+        selectDescMat.value = valorDescAtual;
     }
 
+    // Lista de Insumos da Calculadora
     const listaExt = document.getElementById('calc-lista-extras');
     if(listaExt) {
         listaExt.innerHTML = '';
@@ -262,6 +272,9 @@ function atualizarSelectsDinamicos() {
         });
     }
 }
+
+// Atualizar lista material do descarte se mudar o dropdown
+document.getElementById('desc-tipo').addEventListener('change', atualizarSelectsDinamicos);
 
 // ==========================================
 // ABA 1: SIMULAÇÃO DE CUSTOS
@@ -281,7 +294,7 @@ document.getElementById('form-calc').addEventListener('submit', (e) => {
             filamentosUsados.push({ id: filId, nome: fil.nome, peso: peso, custoRef: fil.custoPorGrama });
         }
     }
-    if(filamentosUsados.length === 0) { alert("Selecione pelo menos um filamento."); return; }
+    if(filamentosUsados.length === 0) { alert("Selecione pelo menos um filamento principal."); return; }
 
     const h = parseFloat(document.getElementById('calc-horas').value) || 0;
     const m = parseFloat(document.getElementById('calc-minutos').value) || 0;
@@ -296,13 +309,14 @@ document.getElementById('form-calc').addEventListener('submit', (e) => {
         if(qtd > 0) {
             const extId = parseInt(input.getAttribute('data-id'));
             const extra = DB.extras.find(ex => ex.id === extId);
-            custoExt += (qtd * extra.custoUnitario);
-            extrasUsados.push({ id: extId, nome: extra.nome, qtd: qtd, custoRef: extra.custoUnitario });
+            if(extra) {
+                custoExt += (qtd * extra.custoUnitario);
+                extrasUsados.push({ id: extId, nome: extra.nome, qtd: qtd, custoRef: extra.custoUnitario });
+            }
         }
     });
 
     const custoTotal = custoFil + custoEne + custoMan + custoExt;
-    
     const m3 = custoTotal * 3;
     const m5 = custoTotal * 5;
     const shopeeM3 = (m3 + 4) / 0.8;
@@ -485,7 +499,7 @@ async function apagarReceita(id) {
 }
 
 // ==========================================
-// ABA 3: FÁBRICA (Produção e Descarte)
+// ABA 3: FÁBRICA E DESCARTES
 // ==========================================
 function atualizarSelectProducao() {
     const sel = document.getElementById('prod-receita');
@@ -506,10 +520,19 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     for(let fUsado of receita.filamentosUsados) {
         const fil = DB.filamentos.find(f => f.id === fUsado.id);
         if(!fil || fil.pesoRestante < (fUsado.peso * qtdProduzir)) {
-            alert(`Falta filamento no inventário!`); return;
+            alert(`Falta filamento no inventário! (Necessário: ${fUsado.peso * qtdProduzir}g de ${fUsado.nome})`); return;
+        }
+    }
+    if(receita.extrasUsados) {
+        for(let eUsado of receita.extrasUsados) {
+            const ext = DB.extras.find(ex => ex.id === eUsado.id);
+            if(!ext || ext.qtdRestante < (eUsado.qtd * qtdProduzir)) {
+                alert(`Falta insumo no inventário! (Necessário: ${eUsado.qtd * qtdProduzir} de ${eUsado.nome})`); return;
+            }
         }
     }
 
+    // Dá baixa dos insumos
     receita.filamentosUsados.forEach(fUsado => {
         const fil = DB.filamentos.find(f => f.id === fUsado.id);
         fil.pesoRestante -= (fUsado.peso * qtdProduzir);
@@ -521,9 +544,13 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
         });
     }
 
+    // Cálculo da Média Ponderada para o Custo do Estoque
     let itemEstoque = DB.estoqueProntos.find(p => p.receitaId === receita.id);
     if(itemEstoque) {
+        const custoTotalAntigo = itemEstoque.quantidade * itemEstoque.custoUnitario;
+        const custoTotalNovoLote = qtdProduzir * receita.custoTotal;
         itemEstoque.quantidade += qtdProduzir;
+        itemEstoque.custoUnitario = (custoTotalAntigo + custoTotalNovoLote) / itemEstoque.quantidade; 
     } else {
         DB.estoqueProntos.push({ id: Date.now(), receitaId: receita.id, nome: receita.nome, custoUnitario: receita.custoTotal, quantidade: qtdProduzir });
     }
@@ -542,24 +569,40 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
 document.getElementById('form-descarte').addEventListener('submit', async (e) => {
     e.preventDefault();
     const tipo = document.getElementById('desc-tipo').value;
-    const filId = parseInt(document.getElementById('desc-filamento').value);
-    const peso = parseFloat(document.getElementById('desc-peso').value);
-    const horas = parseFloat(document.getElementById('desc-horas').value) || 0;
-    const min = parseFloat(document.getElementById('desc-min').value) || 0;
+    const materialId = parseInt(document.getElementById('desc-material').value);
+    const quantidadeOuPeso = parseFloat(document.getElementById('desc-peso').value);
     const motivo = document.getElementById('desc-motivo').value || 'Não informado';
 
-    const fil = DB.filamentos.find(f => f.id === filId);
-    if(!fil || peso > fil.pesoRestante) { alert("Estoque insuficiente."); return; }
+    let materialNome = "";
+    let custoTotalPerda = 0;
 
-    const custoMaterial = peso * fil.custoPorGrama;
-    const custoEletrico = (horas + (min / 60)) * 0.15 * 0.95;
-    const custoTotalPerda = custoMaterial + custoEletrico;
+    if(tipo === 'Insumo') {
+        const ext = DB.extras.find(ex => ex.id === materialId);
+        if(!ext || quantidadeOuPeso > ext.qtdRestante) { alert("Estoque insuficiente."); return; }
+        
+        custoTotalPerda = quantidadeOuPeso * ext.custoUnitario;
+        materialNome = ext.nome;
+        ext.qtdRestante -= quantidadeOuPeso;
+    } else {
+        const fil = DB.filamentos.find(f => f.id === materialId);
+        if(!fil || quantidadeOuPeso > fil.pesoRestante) { alert("Estoque insuficiente."); return; }
+        
+        const horas = parseFloat(document.getElementById('desc-horas').value) || 0;
+        const min = parseFloat(document.getElementById('desc-min').value) || 0;
+        const kw = parseFloat(document.getElementById('desc-kw').value) || 0.15;
+        const kwh = parseFloat(document.getElementById('desc-preco-kwh').value) || 0.95;
 
-    fil.pesoRestante -= peso;
-    DB.historicoPerdas.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), tipo, filamentoNome: fil.nome, pesoGasto: peso, tempoGasto: `${horas}h ${min}m`, custoTotal: custoTotalPerda, motivo });
-    
-    // Lança a perda elétrica/descarte também nas saídas do caixa
-    DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Perda (${tipo}): ${fil.nome}`, valor: custoTotalPerda });
+        const custoMaterial = quantidadeOuPeso * fil.custoPorGrama;
+        const custoEletrico = (horas + (min / 60)) * kw * kwh;
+        custoTotalPerda = custoMaterial + custoEletrico;
+        materialNome = fil.nome;
+        fil.pesoRestante -= quantidadeOuPeso;
+        
+        motivo += ` (Tempo: ${horas}h ${min}m)`;
+    }
+
+    DB.historicoPerdas.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), tipo, filamentoNome: materialNome, pesoGasto: quantidadeOuPeso, tempoGasto: "", custoTotal: custoTotalPerda, motivo });
+    DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Perda (${tipo}): ${materialNome}`, valor: custoTotalPerda });
 
     await salvarDB(); alert(`🗑️ Perda registrada.`); document.getElementById('form-descarte').reset(); atualizarSelectsDinamicos(); 
 });
@@ -574,7 +617,7 @@ function renderizarAbaVendas() {
         elLista.innerHTML += `
             <div class="item-card" style="border-left: 4px solid var(--primary);">
                 <div class="item-title">${p.nome}</div>
-                <div class="item-details"><span style="font-weight:bold;">Estoque: ${p.quantidade} un.</span><span>Custo: ${fmtDinheiro(p.custoUnitario)}</span></div>
+                <div class="item-details"><span style="font-weight:bold;">Estoque: ${p.quantidade} un.</span><span>Custo Médio Fab.: ${fmtDinheiro(p.custoUnitario)}</span></div>
             </div>`;
     });
 
@@ -642,20 +685,14 @@ document.getElementById('form-venda').addEventListener('submit', async (e) => {
 // ABA 6: HISTÓRICO & BALANÇO FINANCEIRO
 // ==========================================
 function renderizarHistoricos() {
-    // 1. Cálculo de Fluxo de Caixa
-    const totalEntrou = DB.historicoVendas.reduce((acc, v) => acc + v.precoVendaTotal, 0);
+    // Cálculo do Total Entrou LÍQUIDO (Descontando taxa da plataforma do faturamento)
+    const totalEntrouBruto = DB.historicoVendas.reduce((acc, v) => acc + v.precoVendaTotal, 0);
+    const totalTaxas = DB.historicoVendas.reduce((acc, v) => acc + (v.taxa || 0), 0);
+    const totalEntrou = totalEntrouBruto - totalTaxas;
     
-    if (!DB.historicoGastos || DB.historicoGastos.length === 0) {
-        DB.historicoGastos = [];
-        DB.filamentos.forEach(f => DB.historicoGastos.push({ id: f.id, data: 'Legado', descricao: `Compra: Rolo ${f.nome}`, valor: f.precoTotal }));
-        DB.extras.forEach(x => DB.historicoGastos.push({ id: x.id, data: 'Legado', descricao: `Compra: Insumo ${x.nome}`, valor: x.precoTotal }));
-        salvarDB();
-    }
-    
-    const totalSaiu = DB.historicoGastos.reduce((acc, g) => acc + g.valor, 0);
+    const totalSaiu = DB.historicoGastos ? DB.historicoGastos.reduce((acc, g) => acc + g.valor, 0) : 0;
     const lucroLiquido = totalEntrou - totalSaiu;
 
-    // 2. Atualiza o Dashboard com os 4 Blocos
     document.getElementById('dash-entrou').textContent = fmtDinheiro(totalEntrou);
     document.getElementById('dash-saiu').textContent = fmtDinheiro(totalSaiu);
     
@@ -663,7 +700,7 @@ function renderizarHistoricos() {
     elLucro.textContent = fmtDinheiro(lucroLiquido);
     elLucro.className = lucroLiquido >= 0 ? 'text-success' : 'text-danger';
 
-    // 3. Renderização das Listas
+    // Listas
     const elVendas = document.getElementById('lista-historico-vendas');
     elVendas.innerHTML = '';
     if(DB.historicoVendas.length === 0) elVendas.innerHTML = '<p class="ajuda">Nenhuma venda registrada.</p>';
@@ -671,7 +708,7 @@ function renderizarHistoricos() {
         elVendas.innerHTML += `
             <div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--success);">
                 <div class="flex-between"><strong>${v.quantidade}x ${v.nomeProduto}</strong><span class="badge">${v.data}</span></div>
-                <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;">Canal: ${v.canal} | Recebido: ${fmtDinheiro(v.precoVendaTotal)}</div>
+                <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;">Canal: ${v.canal} | Recebido Bruto: ${fmtDinheiro(v.precoVendaTotal)}</div>
                 <div class="res-row destaque" style="border:none; padding:0; margin-top:0.3rem;"><span>Lucro Real da Venda:</span><strong class="text-success">${fmtDinheiro(v.lucroLiquido)}</strong></div>
             </div>`;
     });
@@ -692,7 +729,7 @@ function renderizarHistoricos() {
     [...DB.historicoPerdas].reverse().forEach(p => {
         elPerdas.innerHTML += `
             <div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--warning);">
-                <div class="flex-between"><strong>${p.tipo}: ${p.pesoGasto}g em ${p.filamentoNome}</strong><span class="badge">${p.data}</span></div>
+                <div class="flex-between"><strong>${p.tipo}: ${p.pesoGasto} em ${p.filamentoNome}</strong><span class="badge">${p.data}</span></div>
                 <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.3rem;">Motivo: ${p.motivo}</div>
                 <div class="res-row destaque" style="border:none; padding:0;"><span style="color:var(--text-muted);">Prejuízo:</span><strong class="text-danger">-${fmtDinheiro(p.custoTotal)}</strong></div>
             </div>`;
