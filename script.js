@@ -297,7 +297,7 @@ document.getElementById('form-calc').addEventListener('submit', (e) => {
             filamentosUsados.push({ id: filId, nome: fil.nome, peso: peso, custoRef: fil.custoPorGrama });
         }
     }
-    if(filamentosUsados.length === 0) { alert("Selecione pelo menos um filamento."); return; }
+    if(filamentosUsados.length === 0) { alert("Selecione pelo menos um filamento principal."); return; }
 
     const h = parseFloat(document.getElementById('calc-horas').value) || 0;
     const m = parseFloat(document.getElementById('calc-minutos').value) || 0;
@@ -320,7 +320,7 @@ document.getElementById('form-calc').addEventListener('submit', (e) => {
     });
 
     const custoTotalFornada = custoFil + custoEne + custoMan + custoExt;
-    const custoUnitario = custoTotalFornada / rende; // Custo dividido pelo rendimento
+    const custoUnitario = custoTotalFornada / rende; 
     
     const m3 = custoUnitario * 3;
     const m5 = custoUnitario * 5;
@@ -534,25 +534,41 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     if (qtdPerdida > qtdTotalProduzida) { alert("A perda não pode ser maior que o total fabricado!"); return; }
     const qtdSucesso = qtdTotalProduzida - qtdPerdida;
 
-    // Fator de gasto material (Total fabricado dividido pelo rendimento da receita base)
-    const rendePadrao = receita.rende || 1;
-    const fatorGasto = qtdTotalProduzida / rendePadrao;
+    // LÓGICA DE INSUMOS NÃO UTILIZADOS NA PERDA
+    let descontarInsumosDaPerda = false;
+    if(qtdPerdida > 0 && receita.extrasUsados && receita.extrasUsados.length > 0) {
+        descontarInsumosDaPerda = confirm(`Você perdeu ${qtdPerdida} peças.\n\nOs insumos extras (ex: correntes, argolas) dessas peças também foram para o lixo?\n\n[OK] Sim, desconte do estoque.\n[Cancelar] Não, sobraram e não vou descontar.`);
+    }
 
+    const rendePadrao = receita.rende || 1;
+    const fatorGastoFilamento = qtdTotalProduzida / rendePadrao;
+    const fatorGastoInsumo = descontarInsumosDaPerda ? (qtdTotalProduzida / rendePadrao) : (qtdSucesso / rendePadrao);
+
+    // Validação de Estoque
     for(let fUsado of receita.filamentosUsados) {
         const fil = DB.filamentos.find(f => f.id === fUsado.id);
-        if(!fil || fil.pesoRestante < (fUsado.peso * fatorGasto)) {
-            alert(`Falta filamento no inventário para produzir essa quantidade!`); return;
+        if(!fil || fil.pesoRestante < (fUsado.peso * fatorGastoFilamento)) {
+            alert(`Falta filamento no inventário! (Necessário: ${fmtNum(fUsado.peso * fatorGastoFilamento)}g de ${fUsado.nome})`); return;
+        }
+    }
+    if(receita.extrasUsados) {
+        for(let eUsado of receita.extrasUsados) {
+            const ext = DB.extras.find(ex => ex.id === eUsado.id);
+            if(!ext || ext.qtdRestante < (eUsado.qtd * fatorGastoInsumo)) {
+                alert(`Falta insumo no inventário! (Necessário: ${fmtNum(eUsado.qtd * fatorGastoInsumo)} de ${eUsado.nome})`); return;
+            }
         }
     }
 
+    // Dá baixa dos materiais proporcionais
     receita.filamentosUsados.forEach(fUsado => {
         const fil = DB.filamentos.find(f => f.id === fUsado.id);
-        fil.pesoRestante -= (fUsado.peso * fatorGasto);
+        fil.pesoRestante -= (fUsado.peso * fatorGastoFilamento);
     });
     if(receita.extrasUsados) {
         receita.extrasUsados.forEach(eUsado => {
             const ext = DB.extras.find(ex => ex.id === eUsado.id);
-            if(ext) ext.qtdRestante -= (eUsado.qtd * fatorGasto);
+            if(ext) ext.qtdRestante -= (eUsado.qtd * fatorGastoInsumo);
         });
     }
 
@@ -570,15 +586,29 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     }
 
     // Lança perdas financeiras se houver
+    let custoPerda = 0;
     if (qtdPerdida > 0) {
-        const custoPerda = receita.custoUnitario * qtdPerdida;
-        DB.historicoPerdas.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), tipo: "Descarte de Produção", filamentoNome: receita.nome, pesoGasto: qtdPerdida, tempoGasto: "N/A", custoTotal: custoPerda, motivo: "Falha durante o lote de fabricação" });
+        let custoInsumosUnitario = 0;
+        if (receita.extrasUsados) {
+            custoInsumosUnitario = receita.extrasUsados.reduce((acc, ex) => acc + (ex.qtd * ex.custoRef), 0) / rendePadrao;
+        }
+        
+        if (descontarInsumosDaPerda) {
+            custoPerda = receita.custoUnitario * qtdPerdida;
+        } else {
+            // Tira o custo da corrente/insumo da conta do prejuízo, pois foi salva
+            custoPerda = Math.max(0, (receita.custoUnitario - custoInsumosUnitario) * qtdPerdida);
+        }
+
+        DB.historicoPerdas.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), tipo: "Descarte de Produção", filamentoNome: receita.nome, pesoGasto: qtdPerdida, tempoGasto: "N/A", custoTotal: custoPerda, motivo: descontarInsumosDaPerda ? "Falha no lote (com insumos perdidos)" : "Falha no lote (insumos salvos)" });
         DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Perda (Produção): ${receita.nome}`, valor: custoPerda });
     }
 
+    // Histórico da Produção
+    const custoTotalRealFornada = (receita.custoUnitario * qtdSucesso) + custoPerda;
     DB.historicoProducao.push({
         id: Date.now(), data: new Date().toLocaleDateString('pt-BR'),
-        nomeProduto: receita.nome, quantidade: qtdSucesso, custoTotalFornada: receita.custoUnitario * qtdTotalProduzida
+        nomeProduto: receita.nome, quantidade: qtdSucesso, custoTotalFornada: custoTotalRealFornada
     });
 
     await salvarDB();
