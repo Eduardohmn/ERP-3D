@@ -111,39 +111,118 @@ function renderizarInventario() {
     });
 }
 
-// --- LÓGICA DE PRODUÇÃO E VENDAS ---
+// --- ABA 1: CÁLCULO ATUALIZADO ---
+document.getElementById('form-calc').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const nomeProduto = document.getElementById('calc-nome').value;
+    const rende = parseInt(document.getElementById('calc-rende').value) || 1;
+    
+    // Calcula custo de filamentos
+    let custoFil = 0;
+    const filamentosUsados = [];
+    for(let i = 1; i <= 4; i++) {
+        const peso = parseFloat(document.getElementById(`calc-peso-${i}`).value) || 0;
+        const filId = document.getElementById(`calc-filamento-${i}`).value;
+        if(peso > 0 && filId) {
+            const filamento = DB.filamentos.find(f => f.id == filId);
+            if(filamento) {
+                custoFil += peso * filamento.custoPorGrama;
+                filamentosUsados.push({ id: filId, peso });
+            }
+        }
+    }
+    
+    // Custo de energia
+    const horas = parseFloat(document.getElementById('calc-horas').value) || 0;
+    const minutos = parseFloat(document.getElementById('calc-minutos').value) || 0;
+    const kw = parseFloat(document.getElementById('calc-kw').value) || 0.15;
+    const precoKwh = parseFloat(document.getElementById('calc-preco-kwh').value) || 0.95;
+    const tempoTotal = horas + (minutos / 60);
+    const custoEne = tempoTotal * kw * precoKwh;
+    const custoMan = custoEne * 0.01;
+    
+    // Custo de extras
+    let custoExt = 0;
+    const extrasUsados = [];
+    document.querySelectorAll('#calc-lista-extras .extra-item').forEach(item => {
+        const extId = item.getAttribute('data-extra-id');
+        const qtd = parseFloat(item.querySelector('.extra-qtd')?.value) || 0;
+        if(qtd > 0 && extId) {
+            const extra = DB.extras.find(e => e.id == extId);
+            if(extra) {
+                custoExt += qtd * extra.custoUnitario;
+                extrasUsados.push({ id: extId, qtd });
+            }
+        }
+    });
+    
+    // Cálculo final
+    const custoTotalFornada = custoFil + custoEne + custoMan + custoExt;
+    const custoUnitario = custoTotalFornada / rende;
+    
+    // Atualiza painel de resultados
+    document.getElementById('res-custo-total').textContent = fmtDinheiro(custoUnitario) + " (por un.)";
+    
+    const m3 = custoUnitario * 3;
+    const m5 = custoUnitario * 5;
+    document.getElementById('res-m3').textContent = fmtDinheiro(m3);
+    document.getElementById('res-m5').textContent = fmtDinheiro(m5);
+    document.getElementById('lucro-m3').textContent = `Lucro: ${fmtDinheiro(m3 - custoUnitario)}`;
+    document.getElementById('lucro-m5').textContent = `Lucro: ${fmtDinheiro(m5 - custoUnitario)}`;
+    
+    const shopeeM3 = (custoUnitario * 3 + 4) / 0.80;
+    const shopeeM5 = (custoUnitario * 5 + 4) / 0.80;
+    document.getElementById('res-shopee-m3').textContent = fmtDinheiro(shopeeM3);
+    document.getElementById('res-shopee-m5').textContent = fmtDinheiro(shopeeM5);
+    
+    document.getElementById('painel-resultados').style.display = 'block';
+    
+    simulacaoAtual = {
+        id: editandoReceitaId || Date.now(),
+        nome: nomeProduto,
+        custoUnitario: custoUnitario,
+        custoTotalFornada: custoTotalFornada,
+        rende: rende,
+        filamentosUsados: filamentosUsados,
+        extrasUsados: extrasUsados,
+        tempoProducao: tempoTotal
+    };
+});
+
+// --- ABA 3: FÁBRICA CORRIGIDA ---
 document.getElementById('form-producao').addEventListener('submit', async (e) => {
     e.preventDefault();
     const receitaId = parseInt(document.getElementById('prod-receita').value);
-    const qtdTotal = parseInt(document.getElementById('prod-qtd').value);
-    const qtdPerdida = parseInt(prompt("Quantas peças foram descartadas?", "0")) || 0;
-    const qtdSucesso = qtdTotal - qtdPerdida;
+    const qtdTotalProduzida = parseInt(document.getElementById('prod-qtd').value);
+    const qtdPerdida = parseInt(prompt("Peças descartadas?", "0")) || 0;
+    const qtdSucesso = qtdTotalProduzida - qtdPerdida;
     
-    if (qtdPerdida > qtdTotal) { alert("Perda maior que total!"); return; }
+    if (qtdPerdida > qtdTotalProduzida) { alert("Perda maior que total!"); return; }
     const receita = DB.receitas.find(r => r.id === receitaId);
     
-    // Baixa Material
-    receita.filamentosUsados.forEach(f => DB.filamentos.find(x => x.id === f.id).pesoRestante -= (f.peso * qtdTotal));
-    if(receita.extrasUsados) receita.extrasUsados.forEach(e => DB.extras.find(x => x.id === e.id).qtdRestante -= (e.qtd * qtdTotal));
+    // Desconta o material equivalente a quantas "fornadas" foram gastas
+    const numFornadas = qtdTotalProduzida / receita.rende;
+    receita.filamentosUsados.forEach(f => DB.filamentos.find(x => x.id === f.id).pesoRestante -= (f.peso * numFornadas));
+    if(receita.extrasUsados) receita.extrasUsados.forEach(e => DB.extras.find(x => x.id === e.id).qtdRestante -= (e.qtd * numFornadas));
 
-    // Salva Estoque
+    // Salva Estoque com Custo Unitário Correto
     let itemEstoque = DB.estoqueProntos.find(p => p.receitaId === receita.id);
     if(itemEstoque) {
         const custoTotalAntigo = itemEstoque.quantidade * itemEstoque.custoUnitario;
-        const custoTotalNovoLote = qtdSucesso * receita.custoTotal;
+        const custoTotalNovoLote = qtdSucesso * receita.custoUnitario;
         itemEstoque.quantidade += qtdSucesso;
         itemEstoque.custoUnitario = (custoTotalAntigo + custoTotalNovoLote) / itemEstoque.quantidade;
     } else {
-        DB.estoqueProntos.push({ id: Date.now(), receitaId: receita.id, nome: receita.nome, custoUnitario: receita.custoTotal, quantidade: qtdSucesso });
+        DB.estoqueProntos.push({ id: Date.now(), receitaId: receita.id, nome: receita.nome, custoUnitario: receita.custoUnitario, quantidade: qtdSucesso });
     }
     
     if(qtdPerdida > 0) {
-        const custoPerda = receita.custoTotal * qtdPerdida;
+        const custoPerda = receita.custoUnitario * qtdPerdida;
         DB.historicoPerdas.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), tipo: "Descarte Produção", filamentoNome: receita.nome, pesoGasto: qtdPerdida, custoTotal: custoPerda, motivo: "Falha Lote" });
         DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Perda: ${receita.nome}`, valor: custoPerda });
     }
     
-    DB.historicoProducao.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), nomeProduto: receita.nome, quantidade: qtdSucesso, custoTotalFornada: receita.custoTotal * qtdTotal });
+    DB.historicoProducao.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), nomeProduto: receita.nome, quantidade: qtdSucesso, custoTotalFornada: receita.custoTotalFornada * numFornadas });
     await salvarDB();
     alert("Produção registrada!");
     document.getElementById('form-producao').reset();
