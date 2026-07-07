@@ -25,14 +25,13 @@
             
             <div class="card">
                 <form id="form-calc">
-                    <div class="form-col" style="margin-bottom: 1.5rem;">
-                        <label>Nome do Produto (Ex: Luminária Mario):</label>
-                        <input type="text" id="calc-nome" required>
-                    </div>
-
-                    <div class="form-row">
+                    <div class="form-row" style="margin-bottom: 1.5rem;">
+                        <div class="form-col" style="flex: 2;">
+                            <label>Nome do Produto (Ex: Luminária Mario):</label>
+                            <input type="text" id="calc-nome" required>
+                        </div>
                         <div class="form-col">
-                            <label>Unidades que rende esta fornada:</label>
+                            <label>Rendimento (Unidades por Fornada):</label>
                             <input type="number" id="calc-rende" min="1" value="1" required>
                         </div>
                     </div>
@@ -92,12 +91,10 @@
                                 <input type="number" id="calc-peso-4" class="calc-filamento-peso" step="0.1" placeholder="0">
                             </div>
                         </div>
-
-                        <div id="aviso-estoque-filamento" style="font-size: 0.85rem; margin-top: 0.5rem; margin-bottom: 1rem;"></div>
                     </fieldset>
 
                     <fieldset>
-                        <legend>Energia Elétrica</legend>
+                        <legend>Energia Elétrica da Fornada</legend>
                         <div class="form-row">
                             <div class="form-col">
                                 <label>Tempo (Horas):</label>
@@ -128,7 +125,7 @@
                 </form>
 
                 <div id="painel-resultados" class="card-alt" style="display: none; padding: 1.5rem; border-radius: 8px; margin-top: 1.5rem; border: 1px solid var(--border);">
-                    <h2>Análise Financeira</h2>
+                    <h2>Análise Financeira (Por Unidade)</h2>
                     <div class="res-row">
                         <span>Custo dos Filamentos:</span><span id="res-custo-fil">R$ 0,00</span>
                     </div>
@@ -139,12 +136,12 @@
                         <span>Custo Insumos:</span><span id="res-custo-ext">R$ 0,00</span>
                     </div>
                     <div class="res-row destaque">
-                        <span>CUSTO DE PRODUÇÃO:</span><strong id="res-custo-total" class="text-danger">R$ 0,00</strong>
+                        <span>CUSTO DE PRODUÇÃO UNITÁRIO:</span><strong id="res-custo-total" class="text-danger">R$ 0,00</strong>
                     </div>
                     
                     <hr>
                     
-                    <h3>Venda Direta (Markups)</h3>
+                    <h3>Venda Direta (Markups Unitários)</h3>
                     <div class="res-row">
                         <span>Atacado (M3 - 3x): <strong id="res-m3">R$ 0,00</strong></span>
                         <span class="lucro text-success" id="lucro-m3">Lucro: R$ 0,00</span>
@@ -199,7 +196,7 @@
             <p class="ajuda">Registre a produção real e perdas para manter seu inventário atualizado.</p>
             
             <div class="card" style="border-color: var(--success);">
-                <h2 style="color: var(--success);">📦 Registrar Produção Concluída</h2>
+                <h2 style="color: var(--success);">📦 Registrar Fornada Concluída</h2>
                 <form id="form-producao">
                     <div class="form-row">
                         <div class="form-col" style="flex: 3;">
@@ -209,18 +206,18 @@
                             </select>
                         </div>
                         <div class="form-col" style="flex: 1;">
-                            <label>Quantidade:</label>
+                            <label>Unidades Fabricadas (Total):</label>
                             <input type="number" id="prod-qtd" min="1" step="1" value="1" required>
                         </div>
                     </div>
-                    <button type="submit" class="btn-success">Fabricar Peça(s)</button>
+                    <button type="submit" class="btn-success">Processar Lote</button>
                 </form>
             </div>
 
             <hr>
 
             <div class="card" style="border-color: var(--warning);">
-                <h2 style="color: var(--warning);">🗑️ Registro de Perdas e Testes</h2>
+                <h2 style="color: var(--warning);">🗑️ Registro Manual de Perdas / Testes</h2>
                 <form id="form-descarte">
                     <div class="form-row">
                         <div class="form-col">
