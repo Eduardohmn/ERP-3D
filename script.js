@@ -3,6 +3,7 @@ const fmtDinheiro = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', c
 const fmtNum = (v) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 // --- ESTADO DO BANCO DE DADOS ---
+let syncTimeLocal = Date.now(); // Marca temporal para evitar sobrescrever o colega
 let DB = {
     filamentos: [], extras: [], receitas: [],
     estoqueProntos: [], historicoProducao: [], historicoVendas: [], historicoPerdas: [],
@@ -60,6 +61,8 @@ async function iniciarNuvem() {
             DB.historicoVendas = cloudDB.historicoVendas || [];
             DB.historicoPerdas = cloudDB.historicoPerdas || []; 
             DB.historicoGastos = cloudDB.historicoGastos || [];
+            
+            syncTimeLocal = Date.now(); // Atualiza o relógio de sincronização
         }
         document.title = "Gestão 3D Pro - ERP";
     } catch (error) {
@@ -68,18 +71,76 @@ async function iniciarNuvem() {
     }
 }
 
+// --- SINCRONIZAÇÃO INTELIGENTE (MERGE DE CONFLITOS) ---
 async function salvarDB() {
-    localStorage.setItem('db_backup', JSON.stringify(DB));
-    if (GITHUB_TOKEN && GIST_ID) {
-        try {
-            await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ files: { 'database.json': { content: JSON.stringify(DB) } } })
-            });
-        } catch (e) {
-            console.error("Falha nuvem:", e);
-        }
+    if (!GITHUB_TOKEN || !GIST_ID) {
+        localStorage.setItem('db_backup', JSON.stringify(DB));
+        return;
+    }
+
+    try {
+        // 1. Baixa a versão mais recente da nuvem antes de salvar
+        const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Authorization': `token ${GITHUB_TOKEN}` } });
+        const data = await res.json();
+        const cloudDB = JSON.parse(data.files['database.json'].content);
+
+        // 2. Função que decide quem tem a informação mais nova
+        const mergeInteligente = (localArr, cloudArr) => {
+            let result = [];
+            const localMap = new Map(localArr.map(i => [i.id, i]));
+            const cloudMap = new Map(cloudArr.map(i => [i.id, i]));
+
+            for (let [id, localItem] of localMap) {
+                const cloudItem = cloudMap.get(id);
+                if (cloudItem) {
+                    const tLocal = localItem.lastModified || localItem.id;
+                    const tCloud = cloudItem.lastModified || cloudItem.id;
+                    result.push(tLocal >= tCloud ? localItem : cloudItem); // Vence o mais recente
+                } else {
+                    result.push(localItem);
+                }
+            }
+            for (let [id, cloudItem] of cloudMap) {
+                if (!localMap.has(id)) {
+                    const itemTime = cloudItem.lastModified || cloudItem.id;
+                    if (itemTime >= syncTimeLocal) {
+                        result.push(cloudItem); // Colega criou recentemente enquanto eu estava offline
+                    }
+                }
+            }
+            return result;
+        };
+
+        // 3. Aplica a fusão em todas as tabelas
+        DB.filamentos = mergeInteligente(DB.filamentos, cloudDB.filamentos || []);
+        DB.extras = mergeInteligente(DB.extras, cloudDB.extras || []);
+        DB.receitas = mergeInteligente(DB.receitas, cloudDB.receitas || []);
+        DB.estoqueProntos = mergeInteligente(DB.estoqueProntos, cloudDB.estoqueProntos || []);
+        DB.historicoVendas = mergeInteligente(DB.historicoVendas, cloudDB.historicoVendas || []);
+        DB.historicoProducao = mergeInteligente(DB.historicoProducao, cloudDB.historicoProducao || []);
+        DB.historicoPerdas = mergeInteligente(DB.historicoPerdas, cloudDB.historicoPerdas || []);
+        DB.historicoGastos = mergeInteligente(DB.historicoGastos, cloudDB.historicoGastos || []);
+
+        syncTimeLocal = Date.now();
+        localStorage.setItem('db_backup', JSON.stringify(DB));
+
+        // 4. Salva a versão perfeita de volta no GitHub
+        await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: { 'database.json': { content: JSON.stringify(DB) } } })
+        });
+        
+        // Atualiza a tela para exibir dados novos do colega, se houver
+        atualizarSelectsDinamicos();
+        atualizarSelectProducao();
+        renderizarInventario();
+        renderizarCatalogo();
+        renderizarAbaVendas();
+        renderizarHistoricos();
+
+    } catch (e) {
+        console.error("Falha na sincronização inteligente:", e);
     }
 }
 
@@ -103,13 +164,6 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
         const tabId = e.target.getAttribute('data-tab');
         document.getElementById(tabId).classList.add('active');
         e.target.classList.add('active');
-        
-        if(tabId === 'tab-calc') atualizarSelectsDinamicos();
-        if(tabId === 'tab-catalogo') renderizarCatalogo();
-        if(tabId === 'tab-fabrica') { atualizarSelectsDinamicos(); atualizarSelectProducao(); }
-        if(tabId === 'tab-inv') renderizarInventario();
-        if(tabId === 'tab-vendas') renderizarAbaVendas();
-        if(tabId === 'tab-hist') renderizarHistoricos();
     });
 });
 
@@ -121,9 +175,9 @@ document.getElementById('form-filamento').addEventListener('submit', async (e) =
     const nome = document.getElementById('fil-nome').value;
     const peso = parseFloat(document.getElementById('fil-peso').value);
     const preco = parseFloat(document.getElementById('fil-preco').value);
-    DB.filamentos.push({ id: Date.now(), nome, pesoInicial: peso, pesoRestante: peso, precoTotal: preco, custoPorGrama: preco / peso });
-    DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Compra: Rolo ${nome}`, valor: preco });
-    await salvarDB(); document.getElementById('form-filamento').reset(); renderizarInventario(); atualizarSelectsDinamicos();
+    DB.filamentos.push({ id: Date.now(), lastModified: Date.now(), nome, pesoInicial: peso, pesoRestante: peso, precoTotal: preco, custoPorGrama: preco / peso });
+    DB.historicoGastos.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Compra: Rolo ${nome}`, valor: preco });
+    await salvarDB(); document.getElementById('form-filamento').reset();
 });
 
 document.getElementById('form-extra').addEventListener('submit', async (e) => {
@@ -132,9 +186,9 @@ document.getElementById('form-extra').addEventListener('submit', async (e) => {
     const medida = document.getElementById('ext-medida').value;
     const qtd = parseFloat(document.getElementById('ext-qtd').value);
     const preco = parseFloat(document.getElementById('ext-preco').value);
-    DB.extras.push({ id: Date.now(), nome, medida, qtdInicial: qtd, qtdRestante: qtd, precoTotal: preco, custoUnitario: preco / qtd });
-    DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Compra: Insumo ${nome}`, valor: preco });
-    await salvarDB(); document.getElementById('form-extra').reset(); renderizarInventario(); atualizarSelectsDinamicos();
+    DB.extras.push({ id: Date.now(), lastModified: Date.now(), nome, medida, qtdInicial: qtd, qtdRestante: qtd, precoTotal: preco, custoUnitario: preco / qtd });
+    DB.historicoGastos.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Compra: Insumo ${nome}`, valor: preco });
+    await salvarDB(); document.getElementById('form-extra').reset();
 });
 
 function renderizarInventario() {
@@ -193,8 +247,9 @@ async function editarFil(id) {
         const pesoNumerico = parseFloat(novoPeso.replace(',', '.'));
         if (!isNaN(pesoNumerico) && pesoNumerico >= 0) {
             fil.pesoRestante = pesoNumerico;
+            fil.lastModified = Date.now();
             if (fil.pesoRestante > fil.pesoInicial) { fil.pesoInicial = fil.pesoRestante; fil.custoPorGrama = fil.precoTotal / fil.pesoInicial; }
-            await salvarDB(); renderizarInventario(); atualizarSelectsDinamicos();
+            await salvarDB();
         }
     }
 }
@@ -208,14 +263,15 @@ async function editarExt(id) {
         const qtdNumerica = parseFloat(novaQtd.replace(',', '.'));
         if (!isNaN(qtdNumerica) && qtdNumerica >= 0) {
             ext.qtdRestante = qtdNumerica;
+            ext.lastModified = Date.now();
             if (ext.qtdRestante > ext.qtdInicial) { ext.qtdInicial = ext.qtdRestante; ext.custoUnitario = ext.precoTotal / ext.qtdInicial; }
-            await salvarDB(); renderizarInventario(); atualizarSelectsDinamicos();
+            await salvarDB();
         }
     }
 }
 
-async function apagarFil(id) { if(confirm("Apagar filamento?")) { DB.filamentos = DB.filamentos.filter(f => f.id !== id); await salvarDB(); renderizarInventario(); atualizarSelectsDinamicos(); } }
-async function apagarExt(id) { if(confirm("Apagar insumo?")) { DB.extras = DB.extras.filter(x => x.id !== id); await salvarDB(); renderizarInventario(); atualizarSelectsDinamicos(); } }
+async function apagarFil(id) { if(confirm("Apagar filamento?")) { DB.filamentos = DB.filamentos.filter(f => f.id !== id); await salvarDB(); } }
+async function apagarExt(id) { if(confirm("Apagar insumo?")) { DB.extras = DB.extras.filter(x => x.id !== id); await salvarDB(); } }
 
 // ==========================================
 // CONFIGURAÇÃO DE COMPONENTES DINÂMICOS
@@ -344,6 +400,7 @@ document.getElementById('form-calc').addEventListener('submit', (e) => {
     
     simulacaoAtual = { 
         id: editandoReceitaId || Date.now(), 
+        lastModified: Date.now(),
         nome: nomeProduto, 
         custoUnitario: custoUnitario, 
         custoTotalFornada: custoTotalFornada,
@@ -408,7 +465,6 @@ document.getElementById('btn-salvar-receita').addEventListener('click', async ()
 
     await salvarDB();
     resetarSimulacao();
-    atualizarSelectProducao();
 });
 
 document.getElementById('btn-cancelar-edicao').addEventListener('click', () => {
@@ -506,7 +562,7 @@ function editarReceita(id) {
 async function apagarReceita(id) {
     if(confirm("Deseja realmente excluir esta receita do catálogo?")) {
         DB.receitas = DB.receitas.filter(r => r.id !== id);
-        await salvarDB(); renderizarCatalogo(); atualizarSelectProducao();
+        await salvarDB();
     }
 }
 
@@ -534,17 +590,15 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     if (qtdPerdida > qtdTotalProduzida) { alert("A perda não pode ser maior que o total fabricado!"); return; }
     const qtdSucesso = qtdTotalProduzida - qtdPerdida;
 
-    // LÓGICA DE INSUMOS NÃO UTILIZADOS NA PERDA
     let descontarInsumosDaPerda = false;
     if(qtdPerdida > 0 && receita.extrasUsados && receita.extrasUsados.length > 0) {
-        descontarInsumosDaPerda = confirm(`Você perdeu ${qtdPerdida} peças.\n\nOs insumos extras (ex: correntes, argolas) dessas peças também foram para o lixo?\n\n[OK] Sim, desconte do estoque.\n[Cancelar] Não, sobraram e não vou descontar.`);
+        descontarInsumosDaPerda = confirm(`Você perdeu ${qtdPerdida} peças.\n\nOs insumos extras (ex: correntes) também foram para o lixo?\n\n[OK] Sim, desconte do estoque.\n[Cancelar] Não, sobraram e não vou descontar.`);
     }
 
     const rendePadrao = receita.rende || 1;
     const fatorGastoFilamento = qtdTotalProduzida / rendePadrao;
     const fatorGastoInsumo = descontarInsumosDaPerda ? (qtdTotalProduzida / rendePadrao) : (qtdSucesso / rendePadrao);
 
-    // Validação de Estoque
     for(let fUsado of receita.filamentosUsados) {
         const fil = DB.filamentos.find(f => f.id === fUsado.id);
         if(!fil || fil.pesoRestante < (fUsado.peso * fatorGastoFilamento)) {
@@ -560,19 +614,21 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
         }
     }
 
-    // Dá baixa dos materiais proporcionais
     receita.filamentosUsados.forEach(fUsado => {
         const fil = DB.filamentos.find(f => f.id === fUsado.id);
         fil.pesoRestante -= (fUsado.peso * fatorGastoFilamento);
+        fil.lastModified = Date.now();
     });
     if(receita.extrasUsados) {
         receita.extrasUsados.forEach(eUsado => {
             const ext = DB.extras.find(ex => ex.id === eUsado.id);
-            if(ext) ext.qtdRestante -= (eUsado.qtd * fatorGastoInsumo);
+            if(ext) {
+                ext.qtdRestante -= (eUsado.qtd * fatorGastoInsumo);
+                ext.lastModified = Date.now();
+            }
         });
     }
 
-    // Salva Estoque (Média Ponderada)
     if(qtdSucesso > 0) {
         let itemEstoque = DB.estoqueProntos.find(p => p.receitaId === receita.id);
         if(itemEstoque) {
@@ -580,12 +636,12 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
             const valorNovoLote = qtdSucesso * receita.custoUnitario;
             itemEstoque.quantidade += qtdSucesso;
             itemEstoque.custoUnitario = (valorEstoqueAntigo + valorNovoLote) / itemEstoque.quantidade; 
+            itemEstoque.lastModified = Date.now();
         } else {
-            DB.estoqueProntos.push({ id: Date.now(), receitaId: receita.id, nome: receita.nome, custoUnitario: receita.custoUnitario, quantidade: qtdSucesso });
+            DB.estoqueProntos.push({ id: Date.now(), lastModified: Date.now(), receitaId: receita.id, nome: receita.nome, custoUnitario: receita.custoUnitario, quantidade: qtdSucesso });
         }
     }
 
-    // Lança perdas financeiras se houver
     let custoPerda = 0;
     if (qtdPerdida > 0) {
         let custoInsumosUnitario = 0;
@@ -596,28 +652,24 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
         if (descontarInsumosDaPerda) {
             custoPerda = receita.custoUnitario * qtdPerdida;
         } else {
-            // Tira o custo da corrente/insumo da conta do prejuízo, pois foi salva
             custoPerda = Math.max(0, (receita.custoUnitario - custoInsumosUnitario) * qtdPerdida);
         }
 
-        DB.historicoPerdas.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), tipo: "Descarte de Produção", filamentoNome: receita.nome, pesoGasto: qtdPerdida, tempoGasto: "N/A", custoTotal: custoPerda, motivo: descontarInsumosDaPerda ? "Falha no lote (com insumos perdidos)" : "Falha no lote (insumos salvos)" });
-        DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Perda (Produção): ${receita.nome}`, valor: custoPerda });
+        DB.historicoPerdas.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), tipo: "Descarte de Produção", filamentoNome: receita.nome, pesoGasto: qtdPerdida, tempoGasto: "N/A", custoTotal: custoPerda, motivo: descontarInsumosDaPerda ? "Falha no lote (com insumos perdidos)" : "Falha no lote (insumos salvos)" });
+        DB.historicoGastos.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Perda (Produção): ${receita.nome}`, valor: custoPerda });
     }
 
-    // Histórico da Produção
     const custoTotalRealFornada = (receita.custoUnitario * qtdSucesso) + custoPerda;
     DB.historicoProducao.push({
-        id: Date.now(), data: new Date().toLocaleDateString('pt-BR'),
+        id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'),
         nomeProduto: receita.nome, quantidade: qtdSucesso, custoTotalFornada: custoTotalRealFornada
     });
 
     await salvarDB();
     alert(`📦 Resumo da Fornada:\nSucesso: ${qtdSucesso} prontas\nDescarte: ${qtdPerdida} perdidas.`);
     document.getElementById('form-producao').reset();
-    atualizarSelectsDinamicos();
 });
 
-// Descarte Manual de Material/Insumo
 document.getElementById('form-descarte').addEventListener('submit', async (e) => {
     e.preventDefault();
     const tipo = document.getElementById('desc-tipo').value;
@@ -635,6 +687,7 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
         custoTotalPerda = quantidadeOuPeso * ext.custoUnitario;
         materialNome = ext.nome;
         ext.qtdRestante -= quantidadeOuPeso;
+        ext.lastModified = Date.now();
     } else {
         const fil = DB.filamentos.find(f => f.id === materialId);
         if(!fil || quantidadeOuPeso > fil.pesoRestante) { alert("Estoque insuficiente."); return; }
@@ -649,14 +702,15 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
         custoTotalPerda = custoMaterial + custoEletrico;
         materialNome = fil.nome;
         fil.pesoRestante -= quantidadeOuPeso;
+        fil.lastModified = Date.now();
         
         motivo += ` (Tempo: ${horas}h ${min}m)`;
     }
 
-    DB.historicoPerdas.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), tipo, filamentoNome: materialNome, pesoGasto: quantidadeOuPeso, tempoGasto: "N/A", custoTotal: custoTotalPerda, motivo });
-    DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Perda (${tipo}): ${materialNome}`, valor: custoTotalPerda });
+    DB.historicoPerdas.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), tipo, filamentoNome: materialNome, pesoGasto: quantidadeOuPeso, tempoGasto: "N/A", custoTotal: custoTotalPerda, motivo });
+    DB.historicoGastos.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Perda (${tipo}): ${materialNome}`, valor: custoTotalPerda });
 
-    await salvarDB(); alert(`🗑️ Perda financeira de ${fmtDinheiro(custoTotalPerda)} registrada.`); document.getElementById('form-descarte').reset(); atualizarSelectsDinamicos(); 
+    await salvarDB(); alert(`🗑️ Perda financeira de ${fmtDinheiro(custoTotalPerda)} registrada.`); document.getElementById('form-descarte').reset();
 });
 
 // ==========================================
@@ -727,10 +781,12 @@ document.getElementById('form-venda').addEventListener('submit', async (e) => {
     const lucro = (precoUni * qtd) - custoTotalFab - taxa;
 
     produto.quantidade -= qtd;
+    produto.lastModified = Date.now();
+    
     if(produto.quantidade === 0) { DB.estoqueProntos = DB.estoqueProntos.filter(p => p.id !== prodId); }
 
-    DB.historicoVendas.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), nomeProduto: produto.nome, quantidade: qtd, canal, precoVendaTotal: (precoUni * qtd), taxa, lucroLiquido: lucro });
-    await salvarDB(); alert(`💲 Venda de ${qtd} un. registrada.`); document.getElementById('form-venda').reset(); calcularPrevVenda(); renderizarAbaVendas(); renderizarHistoricos();
+    DB.historicoVendas.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), nomeProduto: produto.nome, quantidade: qtd, canal, precoVendaTotal: (precoUni * qtd), taxa, lucroLiquido: lucro });
+    await salvarDB(); alert(`💲 Venda de ${qtd} un. registrada.`); document.getElementById('form-venda').reset(); calcularPrevVenda();
 });
 
 // ==========================================
