@@ -5,10 +5,11 @@ const fmtNum = (v) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maxi
 // --- ESTADO DO BANCO DE DADOS ---
 let DB = {
     filamentos: [], extras: [], receitas: [],
-    estoqueProntos: [], historicoProducao: [], historicoVendas: [], historicoPerdas: []
+    estoqueProntos: [], historicoProducao: [], historicoVendas: [], historicoPerdas: [],
+    historicoGastos: []
 };
 let simulacaoAtual = null;
-let editandoReceitaId = null; // Controle para edição do catálogo
+let editandoReceitaId = null;
 
 // --- INTEGRAÇÃO COM GITHUB GISTS ---
 let GITHUB_TOKEN = localStorage.getItem('github_token');
@@ -62,6 +63,7 @@ async function iniciarNuvem() {
             DB.historicoProducao = cloudDB.historicoProducao || [];
             DB.historicoVendas = cloudDB.historicoVendas || [];
             DB.historicoPerdas = cloudDB.historicoPerdas || []; 
+            DB.historicoGastos = cloudDB.historicoGastos || [];
         }
         document.title = "Gestão 3D Pro - ERP";
         iniciarApp(); 
@@ -114,7 +116,13 @@ document.getElementById('form-filamento').addEventListener('submit', async (e) =
     const nome = document.getElementById('fil-nome').value;
     const peso = parseFloat(document.getElementById('fil-peso').value);
     const preco = parseFloat(document.getElementById('fil-preco').value);
+    
+    // Cadastra material no inventário
     DB.filamentos.push({ id: Date.now(), nome, pesoInicial: peso, pesoRestante: peso, precoTotal: preco, custoPorGrama: preco / peso });
+    
+    // Lança automaticamente o custo de aquisição nos Gastos do ERP
+    DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Compra: Rolo ${nome}`, valor: preco });
+    
     await salvarDB(); document.getElementById('form-filamento').reset(); renderizarInventario();
 });
 
@@ -124,7 +132,13 @@ document.getElementById('form-extra').addEventListener('submit', async (e) => {
     const medida = document.getElementById('ext-medida').value;
     const qtd = parseFloat(document.getElementById('ext-qtd').value);
     const preco = parseFloat(document.getElementById('ext-preco').value);
+    
+    // Cadastra acessório no inventário
     DB.extras.push({ id: Date.now(), nome, medida, qtdInicial: qtd, qtdRestante: qtd, precoTotal: preco, custoUnitario: preco / qtd });
+    
+    // Lança automaticamente o custo de aquisição nos Gastos do ERP
+    DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Compra: Insumo ${nome}`, valor: preco });
+    
     await salvarDB(); document.getElementById('form-extra').reset(); renderizarInventario();
 });
 
@@ -206,9 +220,8 @@ async function editarExt(id) {
 async function apagarFil(id) { if(confirm("Apagar filamento?")) { DB.filamentos = DB.filamentos.filter(f => f.id !== id); await salvarDB(); renderizarInventario(); } }
 async function apagarExt(id) { if(confirm("Apagar insumo?")) { DB.extras = DB.extras.filter(x => x.id !== id); await salvarDB(); renderizarInventario(); } }
 
-
 // ==========================================
-// DADOS DINÂMICOS (Puxa para Abas de Simulação e Fábrica)
+// CONFIGURAÇÃO DE COMPONENTES DINÂMICOS
 // ==========================================
 function atualizarSelectsDinamicos() {
     for(let i=1; i<=4; i++) {
@@ -310,9 +323,8 @@ document.getElementById('form-calc').addEventListener('submit', (e) => {
 
     document.getElementById('sim-shopee-preco').value = shopeeM5.toFixed(2);
     
-    // Armazena com os dados brutos salvos para recarregar caso queira editar depois
     simulacaoAtual = { 
-        id: editandoReceitaId || Date.now(), // Mantém o ID se estiver editando
+        id: editandoReceitaId || Date.now(), 
         nome: nomeProduto, 
         custoTotal, 
         filamentosUsados, 
@@ -404,7 +416,7 @@ function renderizarCatalogo() {
     }
     
     DB.receitas.forEach(r => {
-        let filTxt = r.filamentosUsados.map(f => `${fmtNum(f.peso)}g de ${f.nome}`).join(', ');
+        let fillTxt = r.filamentosUsados.map(f => `${fmtNum(f.peso)}g de ${f.nome}`).join(', ');
         let extTxt = r.extrasUsados && r.extrasUsados.length ? r.extrasUsados.map(ex => `${fmtNum(ex.qtd)}x ${ex.nome}`).join(', ') : 'Nenhum';
         
         el.innerHTML += `
@@ -412,13 +424,13 @@ function renderizarCatalogo() {
             <div class="item-title">
                 ${r.nome}
                 <div style="display:flex; gap:0.3rem;">
-                    <button type="button" class="btn-small" style="background-color: var(--warning); color: #000; border: none; border-radius: 4px; cursor: pointer;" onclick="editarReceita(${r.id})" title="Editar Projeto">✏️</button>
-                    <button type="button" class="btn-danger btn-small" style="border: none; border-radius: 4px; cursor: pointer;" onclick="apagarReceita(${r.id})" title="Excluir do Catálogo">X</button>
+                    <button type="button" class="btn-small" style="background-color: var(--warning); color: #000; border: none; border-radius: 4px; cursor: pointer;" onclick="editarReceita(${r.id})">✏️</button>
+                    <button type="button" class="btn-danger btn-small" style="border: none; border-radius: 4px; cursor: pointer;" onclick="apagarReceita(${r.id})">X</button>
                 </div>
             </div>
             <div class="item-details">
                 <span style="color: var(--primary); font-weight: bold;">Custo Base: ${fmtDinheiro(r.custoTotal)}</span>
-                <span style="font-size: 0.8rem; margin-top: 0.3rem;"><strong>Filamentos:</strong> ${filTxt}</span>
+                <span style="font-size: 0.8rem; margin-top: 0.3rem;"><strong>Filamentos:</strong> ${fillTxt}</span>
                 <span style="font-size: 0.8rem;"><strong>Insumos:</strong> ${extTxt}</span>
             </div>
         </div>`;
@@ -429,21 +441,16 @@ function editarReceita(id) {
     const r = DB.receitas.find(x => x.id === id);
     if(!r) return;
     
-    // Volta para a aba de simulação
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     document.getElementById('tab-calc').classList.add('active');
     document.querySelector('[data-tab="tab-calc"]').classList.add('active');
     
     document.getElementById('calc-nome').value = r.nome;
-    
-    // Limpa os campos
     for(let i=1; i<=4; i++) {
         document.getElementById(`calc-filamento-${i}`).value = "";
         document.getElementById(`calc-peso-${i}`).value = "";
     }
-    
-    // Preenche com os dados da receita
     r.filamentosUsados.forEach((fUsado, index) => {
         if(index < 4) {
             const i = index + 1;
@@ -451,14 +458,12 @@ function editarReceita(id) {
             document.getElementById(`calc-peso-${i}`).value = fUsado.peso;
         }
     });
-    
     if(r.params) {
         document.getElementById('calc-horas').value = r.params.h || 0;
         document.getElementById('calc-minutos').value = r.params.m || 0;
         document.getElementById('calc-kw').value = r.params.kw || 0.15;
         document.getElementById('calc-preco-kwh').value = r.params.precoKwh || 0.95;
     }
-    
     document.querySelectorAll('.calc-ext-uso').forEach(input => input.value = "");
     if(r.extrasUsados) {
         r.extrasUsados.forEach(eUsado => {
@@ -466,27 +471,23 @@ function editarReceita(id) {
             if(input) input.value = eUsado.qtd;
         });
     }
-    
     editandoReceitaId = r.id;
     document.getElementById('btn-salvar-receita').innerHTML = "💾 Atualizar Receita no Catálogo";
     document.getElementById('btn-cancelar-edicao').style.display = 'block';
-    
-    // Dispara a simulação para abrir o painel com os dados
     document.getElementById('form-calc').dispatchEvent(new Event('submit'));
 }
 
 async function apagarReceita(id) {
-    if(confirm("Deseja realmente excluir esta receita do catálogo?\nIsso NÃO afeta peças que já estão prontas no estoque.")) {
+    if(confirm("Deseja realmente excluir esta receita do catálogo?")) {
         DB.receitas = DB.receitas.filter(r => r.id !== id);
-        await salvarDB();
-        renderizarCatalogo();
+        await salvarDB(); renderizarCatalogo();
     }
 }
 
 // ==========================================
 // ABA 3: FÁBRICA (Produção e Descarte)
 // ==========================================
-function atualizarSelectProducao() {
+function atualizarSelectProduction() {
     const sel = document.getElementById('prod-receita');
     if(!sel) return;
     sel.innerHTML = '<option value="">Selecione um produto salvo no catálogo...</option>';
@@ -502,47 +503,38 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     const receita = DB.receitas.find(r => r.id === receitaId);
     if(!receita) return;
 
-    // Validação de Estoque
     for(let fUsado of receita.filamentosUsados) {
         const fil = DB.filamentos.find(f => f.id === fUsado.id);
         if(!fil || fil.pesoRestante < (fUsado.peso * qtdProduzir)) {
-            alert(`Falta filamento! O projeto precisa de ${fmtNum(fUsado.peso * qtdProduzir)}g de "${fUsado.nome}". Você não tem o suficiente no inventário.`); return;
-        }
-    }
-    for(let eUsado of receita.extrasUsados) {
-        const ext = DB.extras.find(ex => ex.id === eUsado.id);
-        if(!ext || ext.qtdRestante < (eUsado.qtd * qtdProduzir)) {
-            alert(`Falta insumo! O projeto precisa de ${fmtNum(eUsado.qtd * qtdProduzir)} de "${eUsado.nome}". Você não tem o suficiente no inventário.`); return;
+            alert(`Falta filamento no inventário!`); return;
         }
     }
 
-    // Baixa
     receita.filamentosUsados.forEach(fUsado => {
         const fil = DB.filamentos.find(f => f.id === fUsado.id);
         fil.pesoRestante -= (fUsado.peso * qtdProduzir);
     });
-    receita.extrasUsados.forEach(eUsado => {
-        const ext = DB.extras.find(ex => ex.id === eUsado.id);
-        ext.qtdRestante -= (eUsado.qtd * qtdProduzir);
-    });
+    if(receita.extrasUsados) {
+        receita.extrasUsados.forEach(eUsado => {
+            const ext = DB.extras.find(ex => ex.id === eUsado.id);
+            ext.qtdRestante -= (eUsado.qtd * qtdProduzir);
+        });
+    }
 
-    // Salva Estoque Pronto
     let itemEstoque = DB.estoqueProntos.find(p => p.receitaId === receita.id);
     if(itemEstoque) {
         itemEstoque.quantidade += qtdProduzir;
-        itemEstoque.custoUnitario = receita.custoTotal; 
     } else {
         DB.estoqueProntos.push({ id: Date.now(), receitaId: receita.id, nome: receita.nome, custoUnitario: receita.custoTotal, quantidade: qtdProduzir });
     }
 
-    // Salva Histórico
     DB.historicoProducao.push({
-        id: Date.now(), data: new Date().toLocaleDateString('pt-BR', {hour: '2-digit', minute:'2-digit'}),
+        id: Date.now(), data: new Date().toLocaleDateString('pt-BR'),
         nomeProduto: receita.nome, quantidade: qtdProduzir, custoTotalFornada: receita.custoTotal * qtdProduzir
     });
 
     await salvarDB();
-    alert(`📦 ${qtdProduzir} unidade(s) de "${receita.nome}" produzida(s) com sucesso!\n\nFoi transferido para a aba Vendas.`);
+    alert(`📦 Produção de ${qtdProduzir}x "${receita.nome}" enviada para estoque pronto.`);
     document.getElementById('form-producao').reset();
     atualizarSelectsDinamicos();
 });
@@ -557,29 +549,19 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
     const motivo = document.getElementById('desc-motivo').value || 'Não informado';
 
     const fil = DB.filamentos.find(f => f.id === filId);
-    if(!fil || peso > fil.pesoRestante) {
-        alert("Quantidade gasta maior do que o estoque disponível."); return;
-    }
-
-    const kw = parseFloat(document.getElementById('desc-kw').value) || 0.15;
-    const kwh = parseFloat(document.getElementById('desc-preco-kwh').value) || 0.95;
+    if(!fil || peso > fil.pesoRestante) { alert("Estoque insuficiente."); return; }
 
     const custoMaterial = peso * fil.custoPorGrama;
-    const custoEletrico = (horas + (min / 60)) * kw * kwh;
+    const custoEletrico = (horas + (min / 60)) * 0.15 * 0.95;
     const custoTotalPerda = custoMaterial + custoEletrico;
 
     fil.pesoRestante -= peso;
+    DB.historicoPerdas.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), tipo, filamentoNome: fil.nome, pesoGasto: peso, tempoGasto: `${horas}h ${min}m`, custoTotal: custoTotalPerda, motivo });
+    
+    // Lança a perda elétrica/descarte também nas saídas do caixa
+    DB.historicoGastos.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Perda (${tipo}): ${fil.nome}`, valor: custoTotalPerda });
 
-    DB.historicoPerdas.push({
-        id: Date.now(), data: new Date().toLocaleDateString('pt-BR', {hour: '2-digit', minute:'2-digit'}),
-        tipo: tipo, filamentoNome: fil.nome, pesoGasto: peso, 
-        tempoGasto: `${horas}h ${min}m`, custoTotal: custoTotalPerda, motivo: motivo
-    });
-
-    await salvarDB();
-    alert(`🗑️ Registro salvo. A perda financeira calculada foi de ${fmtDinheiro(custoTotalPerda)}.`);
-    document.getElementById('form-descarte').reset();
-    atualizarSelectsDinamicos(); 
+    await salvarDB(); alert(`🗑️ Perda registrada.`); document.getElementById('form-descarte').reset(); atualizarSelectsDinamicos(); 
 });
 
 // ==========================================
@@ -588,16 +570,11 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
 function renderizarAbaVendas() {
     const elLista = document.getElementById('lista-estoque-prontos');
     elLista.innerHTML = '';
-    if(DB.estoqueProntos.length === 0) elLista.innerHTML = '<p class="ajuda">Nenhum produto pronto no estoque.</p>';
-    
     DB.estoqueProntos.forEach(p => {
         elLista.innerHTML += `
             <div class="item-card" style="border-left: 4px solid var(--primary);">
                 <div class="item-title">${p.nome}</div>
-                <div class="item-details">
-                    <span style="font-weight: bold; font-size: 1rem; color: var(--text-main);">Em estoque: ${p.quantidade} un.</span>
-                    <span>Custo Base Fab.: ${fmtDinheiro(p.custoUnitario)}</span>
-                </div>
+                <div class="item-details"><span style="font-weight:bold;">Estoque: ${p.quantidade} un.</span><span>Custo: ${fmtDinheiro(p.custoUnitario)}</span></div>
             </div>`;
     });
 
@@ -605,7 +582,7 @@ function renderizarAbaVendas() {
     selectVenda.innerHTML = '<option value="">Selecione no estoque pronto...</option>';
     DB.estoqueProntos.forEach(p => {
         if(p.quantidade > 0) {
-            const opt = document.createElement('option'); opt.value = p.id; opt.textContent = `${p.nome} (Disp: ${p.quantidade})`; selectVenda.appendChild(opt);
+            const opt = document.createElement('option'); opt.value = p.id; opt.textContent = `${p.nome} (${p.quantidade})`; selectVenda.appendChild(opt);
         }
     });
 }
@@ -621,19 +598,15 @@ const calcularPrevVenda = () => {
     const elLucro = document.getElementById('prev-lucro');
 
     if(!prodId || qtd <= 0 || precoUni <= 0) { elCusto.textContent = "R$ 0,00"; elTaxa.textContent = "R$ 0,00"; elLucro.textContent = "R$ 0,00"; return; }
-
     const produto = DB.estoqueProntos.find(p => p.id === prodId);
     if(!produto) return;
 
     const custoTotalFornada = produto.custoUnitario * qtd;
     const receitaBruta = precoUni * qtd;
-    let taxaTotal = 0;
-
-    if(canal === 'Shopee') { taxaTotal = ((precoUni * 0.20) + 4) * qtd; }
-
+    let taxaTotal = canal === 'Shopee' ? ((precoUni * 0.20) + 4) * qtd : 0;
     const lucroLiquido = receitaBruta - custoTotalFornada - taxaTotal;
 
-    elCusto.textContent = fmtDinheiro(produto.custoUnitario * qtd);
+    elCusto.textContent = fmtDinheiro(custoTotalFornada);
     elTaxa.textContent = fmtDinheiro(taxaTotal);
     elLucro.textContent = fmtDinheiro(lucroLiquido);
     elLucro.className = lucroLiquido > 0 ? 'text-success' : 'text-danger';
@@ -652,88 +625,73 @@ document.getElementById('form-venda').addEventListener('submit', async (e) => {
     const precoUni = parseFloat(document.getElementById('venda-preco').value);
 
     const produto = DB.estoqueProntos.find(p => p.id === prodId);
-    if(qtd > produto.quantidade) { alert("Você não tem essa quantidade pronta!"); return; }
+    if(qtd > produto.quantidade) { alert("Estoque pronto insuficiente!"); return; }
 
     const custoTotalFab = produto.custoUnitario * qtd;
-    let taxa = 0;
-    if(canal === 'Shopee') { taxa = ((precoUni * 0.20) + 4) * qtd; }
+    let taxa = canal === 'Shopee' ? ((precoUni * 0.20) + 4) * qtd : 0;
     const lucro = (precoUni * qtd) - custoTotalFab - taxa;
 
     produto.quantidade -= qtd;
     if(produto.quantidade === 0) { DB.estoqueProntos = DB.estoqueProntos.filter(p => p.id !== prodId); }
 
-    DB.historicoVendas.push({
-        id: Date.now(), data: new Date().toLocaleDateString('pt-BR', {hour: '2-digit', minute:'2-digit'}),
-        nomeProduto: produto.nome, quantidade: qtd, canal, precoVendaTotal: (precoUni * qtd), taxa, lucroLiquido: lucro
-    });
-
-    await salvarDB();
-    alert(`💲 Venda salva! Lucro líquido adicionado ao histórico: ${fmtDinheiro(lucro)}`);
-    document.getElementById('form-venda').reset();
-    calcularPrevVenda();
-    renderizarAbaVendas();
+    DB.historicoVendas.push({ id: Date.now(), data: new Date().toLocaleDateString('pt-BR'), nomeProduto: produto.nome, quantidade: qtd, canal, precoVendaTotal: (precoUni * qtd), taxa, lucroLiquido: lucro });
+    await salvarDB(); alert(`💲 Venda registrada.`); document.getElementById('form-venda').reset(); calcularPrevVenda(); renderizarAbaVendas();
 });
 
 // ==========================================
-// ABA 6: HISTÓRICO
+// ABA 6: HISTÓRICO & BALANÇO FINANCEIRO
 // ==========================================
 function renderizarHistoricos() {
+    // 1. Cálculo de Fluxo de Caixa Centralizado
+    const totalEntrou = DB.historicoVendas.reduce((acc, v) => acc + v.precoVendaTotal, 0);
+    
+    // Se for o primeiro boot pós-atualização e a nuvem não tiver histórico de gastos,
+    // popula retroativamente com os custos de aquisição do inventário atual para manter a consistência.
+    if (!DB.historicoGastos || DB.historicoGastos.length === 0) {
+        DB.historicoGastos = [];
+        DB.filamentos.forEach(f => DB.historicoGastos.push({ id: f.id, data: 'Legado', descricao: `Compra: Rolo ${f.nome}`, valor: f.precoTotal }));
+        DB.extras.forEach(x => DB.historicoGastos.push({ id: x.id, data: 'Legado', descricao: `Compra: Insumo ${x.nome}`, valor: x.precoTotal }));
+        salvarDB();
+    }
+    
+    const totalSaiu = DB.historicoGastos.reduce((acc, g) => acc + g.valor, 0);
+
+    // Injeta os valores calculados nos elementos do Dashboard da aba 6
+    document.getElementById('dash-entrou').textContent = fmtDinheiro(totalEntrou);
+    document.getElementById('dash-saiu').textContent = fmtDinheiro(totalSaiu);
+
+    // 2. Renderização das Listas de Histórico
     const elVendas = document.getElementById('lista-historico-vendas');
     elVendas.innerHTML = '';
     if(DB.historicoVendas.length === 0) elVendas.innerHTML = '<p class="ajuda">Nenhuma venda registrada.</p>';
-    
     [...DB.historicoVendas].reverse().forEach(v => {
         elVendas.innerHTML += `
             <div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--success);">
-                <div class="flex-between">
-                    <strong style="color: var(--text-main);">${v.quantidade}x ${v.nomeProduto}</strong>
-                    <span class="badge">${v.data}</span>
-                </div>
-                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
-                    Canal: <strong>${v.canal}</strong> | Total Cobrado: <strong>${fmtDinheiro(v.precoVendaTotal)}</strong>
-                </div>
-                <div class="res-row destaque" style="border:none; padding:0; margin-top:0.3rem;">
-                    <span style="font-size: 0.9rem;">Lucro Líquido Real:</span>
-                    <strong class="${v.lucroLiquido > 0 ? 'text-success' : 'text-danger'}">${fmtDinheiro(v.lucroLiquido)}</strong>
-                </div>
+                <div class="flex-between"><strong>${v.quantidade}x ${v.nomeProduto}</strong><span class="badge">${v.data}</span></div>
+                <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;">Canal: ${v.canal} | Recebido: ${fmtDinheiro(v.precoVendaTotal)}</div>
+                <div class="res-row destaque" style="border:none; padding:0; margin-top:0.3rem;"><span>Lucro Real:</span><strong class="text-success">${fmtDinheiro(v.lucroLiquido)}</strong></div>
             </div>`;
     });
 
     const elProducao = document.getElementById('lista-historico-producao');
     elProducao.innerHTML = '';
     if(DB.historicoProducao.length === 0) elProducao.innerHTML = '<p class="ajuda">Nenhuma produção registrada.</p>';
-
     [...DB.historicoProducao].reverse().forEach(p => {
         elProducao.innerHTML += `
             <div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--primary);">
-                <div class="flex-between">
-                    <strong style="color: var(--text-main);">${p.quantidade}x ${p.nomeProduto} fabricados</strong>
-                    <span class="badge">${p.data}</span>
-                </div>
-                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
-                    Custo Total Produção: <strong>${fmtDinheiro(p.custoTotalFornada)}</strong>
-                </div>
+                <div class="flex-between"><strong>${p.quantidade}x ${p.nomeProduto} fabricados</strong><span class="badge">${p.data}</span></div>
             </div>`;
     });
 
     const elPerdas = document.getElementById('lista-historico-perdas');
     elPerdas.innerHTML = '';
-    if(!DB.historicoPerdas || DB.historicoPerdas.length === 0) elPerdas.innerHTML = '<p class="ajuda">Nenhum descarte ou teste registrado.</p>';
-
-    [...(DB.historicoPerdas || [])].reverse().forEach(p => {
+    if(!DB.historicoPerdas || DB.historicoPerdas.length === 0) elPerdas.innerHTML = '<p class="ajuda">Nenhum descarte.</p>';
+    [...DB.historicoPerdas].reverse().forEach(p => {
         elPerdas.innerHTML += `
             <div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--warning);">
-                <div class="flex-between">
-                    <strong style="color: var(--text-main);">${p.tipo}: ${p.pesoGasto}g de ${p.filamentoNome}</strong>
-                    <span class="badge">${p.data}</span>
-                </div>
-                <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem;">
-                    Tempo perdido: <strong>${p.tempoGasto}</strong> | Motivo: <strong>${p.motivo}</strong>
-                </div>
-                <div class="res-row destaque" style="border:none; padding:0; margin-top:0.3rem;">
-                    <span style="font-size: 0.9rem; color: var(--text-muted);">Prejuízo (Material + Eletricidade):</span>
-                    <strong class="text-danger">-${fmtDinheiro(p.custoTotal)}</strong>
-                </div>
+                <div class="flex-between"><strong>${p.tipo}: ${p.pesoGasto}g em ${p.filamentoNome}</strong><span class="badge">${p.data}</span></div>
+                <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.3rem;">Motivo: ${p.motivo}</div>
+                <div class="res-row destaque" style="border:none; padding:0;"><span style="color:var(--text-muted);">Prejuízo:</span><strong class="text-danger">-${fmtDinheiro(p.custoTotal)}</strong></div>
             </div>`;
     });
 }
