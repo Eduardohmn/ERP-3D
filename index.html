@@ -8,6 +8,7 @@
 </head>
 <body>
 
+    <!-- NAVEGAÇÃO -->
     <nav class="tabs-nav">
         <button class="tab-btn active" data-tab="tab-calc">1. Simulações</button>
         <button class="tab-btn" data-tab="tab-catalogo">2. Catálogo Salvo</button>
@@ -19,6 +20,9 @@
 
     <div class="container">
         
+        <!-- ========================================== -->
+        <!-- ABA 1: SIMULAÇÕES E ORÇAMENTOS -->
+        <!-- ========================================== -->
         <div id="tab-calc" class="tab-content active">
             <h1>Simulação de Custos e Preços</h1>
             <p class="ajuda">Faça o orçamento detalhado da peça. O estoque não será alterado aqui.</p>
@@ -114,12 +118,14 @@
                     <fieldset>
                         <legend>Insumos Extras</legend>
                         <div id="calc-lista-extras" style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
-                            </div>
+                            <!-- Injetado via JS -->
+                        </div>
                     </fieldset>
 
                     <button type="submit" style="width: 100%;">💡 Simular Custos</button>
                 </form>
 
+                <!-- PAINEL DE RESULTADO DETALHADO -->
                 <div id="painel-resultados" class="card-alt" style="display: none; padding: 1.5rem; border-radius: 8px; margin-top: 1.5rem; border: 1px solid var(--border);">
                     <h2>Análise Financeira</h2>
                     <div class="res-row">
@@ -177,16 +183,23 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ABA 2: CATÁLOGO DE PRODUTOS SALVOS -->
+        <!-- ========================================== -->
         <div id="tab-catalogo" class="tab-content">
             <h1>Catálogo de Receitas</h1>
             <p class="ajuda">Gerencie os projetos que você orçou e salvou. Edite custos antigos ou exclua projetos descontinuados.</p>
             
             <div class="card card-alt">
                 <div id="lista-catalogo" class="grid-list">
-                    </div>
+                    <!-- Preenchido via JS -->
+                </div>
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ABA 3: FÁBRICA E DESCARTES -->
+        <!-- ========================================== -->
         <div id="tab-fabrica" class="tab-content">
             <h1>Chão de Fábrica</h1>
             <p class="ajuda">Registre a produção real e perdas para manter seu inventário atualizado.</p>
@@ -258,6 +271,9 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ABA 4: INVENTÁRIO -->
+        <!-- ========================================== -->
         <div id="tab-inv" class="tab-content">
             <h1>Inventário de Matéria-Prima</h1>
             
@@ -326,6 +342,9 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ABA 5: VENDAS E ESTOQUE PRONTO -->
+        <!-- ========================================== -->
         <div id="tab-vendas" class="tab-content">
             <h1>Estoque Pronto & Vendas</h1>
             
@@ -375,21 +394,29 @@
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- ABA 6: HISTÓRICO GERAL -->
+        <!-- ========================================== -->
         <div id="tab-hist" class="tab-content">
             <h1>Painel Financeiro & Relatórios</h1>
             
-            <div class="card" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; background: #161616; border: 1px solid var(--border); margin-bottom: 2rem;">
+            <!-- CONTROLE DE CAIXA EM NUVEM -->
+            <div class="card" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; background: #161616; border: 1px solid var(--border); margin-bottom: 2rem;">
                 <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);">
                     <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">TOTAL ENTROU</span>
-                    <h2 id="dash-entrou" class="text-success" style="margin-top: 0.5rem; font-size: 1.6rem;">R$ 0,00</h2>
+                    <h2 id="dash-entrou" class="text-success" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
                 </div>
                 <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);">
-                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">TOTAL SAIU (GASTOS)</span>
-                    <h2 id="dash-saiu" class="text-danger" style="margin-top: 0.5rem; font-size: 1.6rem;">R$ 0,00</h2>
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">TOTAL SAIU</span>
+                    <h2 id="dash-saiu" class="text-danger" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
+                </div>
+                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">LUCRO LÍQUIDO</span>
+                    <h2 id="dash-lucro" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
                 </div>
                 <div style="text-align: center; padding: 0.5rem;">
-                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">META INVESTIMENTOS</span>
-                    <h2 style="margin-top: 0.5rem; color: var(--warning); font-size: 1.6rem;">R$ 15.703,00</h2>
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">META INVEST.</span>
+                    <h2 style="margin-top: 0.5rem; color: var(--warning); font-size: 1.4rem;">R$ 15.703,00</h2>
                 </div>
             </div>
             

@@ -487,7 +487,7 @@ async function apagarReceita(id) {
 // ==========================================
 // ABA 3: FÁBRICA (Produção e Descarte)
 // ==========================================
-function atualizarSelectProduction() {
+function atualizarSelectProducao() {
     const sel = document.getElementById('prod-receita');
     if(!sel) return;
     sel.innerHTML = '<option value="">Selecione um produto salvo no catálogo...</option>';
@@ -642,11 +642,9 @@ document.getElementById('form-venda').addEventListener('submit', async (e) => {
 // ABA 6: HISTÓRICO & BALANÇO FINANCEIRO
 // ==========================================
 function renderizarHistoricos() {
-    // 1. Cálculo de Fluxo de Caixa Centralizado
+    // 1. Cálculo de Fluxo de Caixa
     const totalEntrou = DB.historicoVendas.reduce((acc, v) => acc + v.precoVendaTotal, 0);
     
-    // Se for o primeiro boot pós-atualização e a nuvem não tiver histórico de gastos,
-    // popula retroativamente com os custos de aquisição do inventário atual para manter a consistência.
     if (!DB.historicoGastos || DB.historicoGastos.length === 0) {
         DB.historicoGastos = [];
         DB.filamentos.forEach(f => DB.historicoGastos.push({ id: f.id, data: 'Legado', descricao: `Compra: Rolo ${f.nome}`, valor: f.precoTotal }));
@@ -655,12 +653,17 @@ function renderizarHistoricos() {
     }
     
     const totalSaiu = DB.historicoGastos.reduce((acc, g) => acc + g.valor, 0);
+    const lucroLiquido = totalEntrou - totalSaiu;
 
-    // Injeta os valores calculados nos elementos do Dashboard da aba 6
+    // 2. Atualiza o Dashboard com os 4 Blocos
     document.getElementById('dash-entrou').textContent = fmtDinheiro(totalEntrou);
     document.getElementById('dash-saiu').textContent = fmtDinheiro(totalSaiu);
+    
+    const elLucro = document.getElementById('dash-lucro');
+    elLucro.textContent = fmtDinheiro(lucroLiquido);
+    elLucro.className = lucroLiquido >= 0 ? 'text-success' : 'text-danger';
 
-    // 2. Renderização das Listas de Histórico
+    // 3. Renderização das Listas
     const elVendas = document.getElementById('lista-historico-vendas');
     elVendas.innerHTML = '';
     if(DB.historicoVendas.length === 0) elVendas.innerHTML = '<p class="ajuda">Nenhuma venda registrada.</p>';
@@ -669,7 +672,7 @@ function renderizarHistoricos() {
             <div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--success);">
                 <div class="flex-between"><strong>${v.quantidade}x ${v.nomeProduto}</strong><span class="badge">${v.data}</span></div>
                 <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;">Canal: ${v.canal} | Recebido: ${fmtDinheiro(v.precoVendaTotal)}</div>
-                <div class="res-row destaque" style="border:none; padding:0; margin-top:0.3rem;"><span>Lucro Real:</span><strong class="text-success">${fmtDinheiro(v.lucroLiquido)}</strong></div>
+                <div class="res-row destaque" style="border:none; padding:0; margin-top:0.3rem;"><span>Lucro Real da Venda:</span><strong class="text-success">${fmtDinheiro(v.lucroLiquido)}</strong></div>
             </div>`;
     });
 
