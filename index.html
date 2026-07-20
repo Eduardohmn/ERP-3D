@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gestão 3D Pro - ERP</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
     <!-- NAVEGAÇÃO -->
@@ -19,11 +21,11 @@
     </nav>
 
     <div class="container">
-        
+
         <!-- ABA 1: SIMULAÇÕES E ORÇAMENTOS -->
         <div id="tab-calc" class="tab-content active">
             <h1>Simulação de Custos e Preços</h1>
-            
+
             <div class="card">
                 <form id="form-calc">
                     <div class="form-row" style="margin-bottom: 1.5rem;">
@@ -40,20 +42,36 @@
                     <fieldset>
                         <legend>Uso de Filamentos (Até 4 cores do AMS)</legend>
                         <div class="form-row">
-                            <div class="form-col" style="flex: 2;"><label>Cor 1 (Principal):</label><select id="calc-filamento-1" class="calc-filamento-select" required><option value="">Selecione...</option></select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-1" step="0.1" required></div>
+                            <div class="form-col" style="flex: 2;"><label>Cor 1 (Principal):</label><select
+                                    id="calc-filamento-1" class="calc-filamento-select" required>
+                                    <option value="">Selecione...</option>
+                                </select></div>
+                            <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-1"
+                                    step="0.1" required></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-col" style="flex: 2;"><label>Cor 2 (Opcional):</label><select id="calc-filamento-2" class="calc-filamento-select"><option value="">Nenhum...</option></select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-2" step="0.1" placeholder="0"></div>
+                            <div class="form-col" style="flex: 2;"><label>Cor 2 (Opcional):</label><select
+                                    id="calc-filamento-2" class="calc-filamento-select">
+                                    <option value="">Nenhum...</option>
+                                </select></div>
+                            <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-2"
+                                    step="0.1" placeholder="0"></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-col" style="flex: 2;"><label>Cor 3 (Opcional):</label><select id="calc-filamento-3" class="calc-filamento-select"><option value="">Nenhum...</option></select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-3" step="0.1" placeholder="0"></div>
+                            <div class="form-col" style="flex: 2;"><label>Cor 3 (Opcional):</label><select
+                                    id="calc-filamento-3" class="calc-filamento-select">
+                                    <option value="">Nenhum...</option>
+                                </select></div>
+                            <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-3"
+                                    step="0.1" placeholder="0"></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-col" style="flex: 2;"><label>Cor 4 (Opcional):</label><select id="calc-filamento-4" class="calc-filamento-select"><option value="">Nenhum...</option></select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-4" step="0.1" placeholder="0"></div>
+                            <div class="form-col" style="flex: 2;"><label>Cor 4 (Opcional):</label><select
+                                    id="calc-filamento-4" class="calc-filamento-select">
+                                    <option value="">Nenhum...</option>
+                                </select></div>
+                            <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-4"
+                                    step="0.1" placeholder="0"></div>
                         </div>
                     </fieldset>
 
@@ -76,48 +94,66 @@
                             </div>
                         </div>
                         <div class="form-row">
-                            <div class="form-col"><label>Tempo (Horas):</label><input type="number" id="calc-horas" min="0" value="0" required></div>
-                            <div class="form-col"><label>Tempo (Min):</label><input type="number" id="calc-minutos" min="0" max="59" value="0" required></div>
-                            <div class="form-col"><label>Consumo (kW):</label><input type="number" id="calc-kw" step="0.001" value="0.095" required></div>
-                            <div class="form-col"><label>Preço kWh (R$):</label><input type="number" id="calc-preco-kwh" step="0.01" value="0.95" required></div>
+                            <div class="form-col"><label>Tempo (Horas):</label><input type="number" id="calc-horas"
+                                    min="0" value="0" required></div>
+                            <div class="form-col"><label>Tempo (Min):</label><input type="number" id="calc-minutos"
+                                    min="0" max="59" value="0" required></div>
+                            <div class="form-col"><label>Consumo (kW):</label><input type="number" id="calc-kw"
+                                    step="0.001" value="0.095" required></div>
+                            <div class="form-col"><label>Preço kWh (R$):</label><input type="number" id="calc-preco-kwh"
+                                    step="0.01" value="0.95" required></div>
                         </div>
                     </fieldset>
 
                     <fieldset>
                         <legend>Insumos Extras</legend>
-                        <div id="calc-lista-extras" style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;"></div>
+                        <div id="calc-lista-extras"
+                            style="margin-top: 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; max-height: 200px; overflow-y: auto;">
+                        </div>
                     </fieldset>
 
                     <button type="submit" style="width: 100%;">💡 Simular Custos</button>
                 </form>
 
-                <div id="painel-resultados" class="card-alt" style="display: none; padding: 1.5rem; border-radius: 8px; margin-top: 1.5rem; border: 1px solid var(--border);">
+                <div id="painel-resultados" class="card-alt"
+                    style="display: none; padding: 1.5rem; border-radius: 8px; margin-top: 1.5rem; border: 1px solid var(--border);">
                     <h2>Análise Financeira (Por Unidade)</h2>
                     <div class="res-row"><span>Custo dos Filamentos:</span><span id="res-custo-fil">R$ 0,00</span></div>
-                    <div class="res-row"><span>Energia + Manut. (1%):</span><span id="res-custo-ener">R$ 0,00</span></div>
+                    <div class="res-row"><span>Energia + Manut. (1%):</span><span id="res-custo-ener">R$ 0,00</span>
+                    </div>
                     <div class="res-row"><span>Custo Insumos:</span><span id="res-custo-ext">R$ 0,00</span></div>
-                    <div class="res-row destaque"><span>CUSTO DE PRODUÇÃO UNITÁRIO:</span><strong id="res-custo-total" class="text-danger">R$ 0,00</strong></div>
+                    <div class="res-row destaque"><span>CUSTO DE PRODUÇÃO UNITÁRIO:</span><strong id="res-custo-total"
+                            class="text-danger">R$ 0,00</strong></div>
                     <hr>
                     <h3>Venda Direta (Markups Unitários)</h3>
-                    <div class="res-row"><span>Atacado (M3 - 3x): <strong id="res-m3">R$ 0,00</strong></span><span class="lucro text-success" id="lucro-m3">Lucro: R$ 0,00</span></div>
-                    <div class="res-row"><span>Varejo (M5 - 5x): <strong id="res-m5">R$ 0,00</strong></span><span class="lucro text-success" id="lucro-m5">Lucro: R$ 0,00</span></div>
+                    <div class="res-row"><span>Atacado (M3 - 3x): <strong id="res-m3">R$ 0,00</strong></span><span
+                            class="lucro text-success" id="lucro-m3">Lucro: R$ 0,00</span></div>
+                    <div class="res-row"><span>Varejo (M5 - 5x): <strong id="res-m5">R$ 0,00</strong></span><span
+                            class="lucro text-success" id="lucro-m5">Lucro: R$ 0,00</span></div>
                     <hr>
                     <h3>Venda na Shopee (Taxa 20% + R$4)</h3>
-                    <div class="res-row"><span>Sugestão para lucro M3: <strong id="res-shopee-m3">R$ 0,00</strong></span></div>
-                    <div class="res-row"><span>Sugestão para lucro M5: <strong id="res-shopee-m5">R$ 0,00</strong></span></div>
+                    <div class="res-row"><span>Sugestão para lucro M3: <strong id="res-shopee-m3">R$
+                                0,00</strong></span></div>
+                    <div class="res-row"><span>Sugestão para lucro M5: <strong id="res-shopee-m5">R$
+                                0,00</strong></span></div>
 
                     <div style="background: var(--bg-input); padding: 1rem; border-radius: 6px; margin-top: 1rem;">
                         <label style="color: var(--shopee); font-weight: bold;">Simulador Dinâmico (Shopee R$):</label>
-                        <input type="number" id="sim-shopee-preco" step="0.01" style="margin-top: 0.5rem; margin-bottom: 1rem;">
+                        <input type="number" id="sim-shopee-preco" step="0.01"
+                            style="margin-top: 0.5rem; margin-bottom: 1rem;">
                         <div class="res-row"><span>Taxa Retida:</span><span id="sim-shopee-taxa">R$ 0,00</span></div>
-                        <div class="res-row"><span>Valor Líquido:</span><span id="sim-shopee-liquido">R$ 0,00</span></div>
-                        <div class="res-row destaque" style="border-top: none; padding-top: 0;"><span>SEU LUCRO REAL:</span><strong id="sim-shopee-lucro">R$ 0,00</strong></div>
+                        <div class="res-row"><span>Valor Líquido:</span><span id="sim-shopee-liquido">R$ 0,00</span>
+                        </div>
+                        <div class="res-row destaque" style="border-top: none; padding-top: 0;"><span>SEU LUCRO
+                                REAL:</span><strong id="sim-shopee-lucro">R$ 0,00</strong></div>
                         <div id="alerta-shopee" style="display: none;" class="alert-box"></div>
                     </div>
-                    
+
                     <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
-                        <button type="button" id="btn-salvar-receita" class="btn-primary" style="flex: 2;">💾 Salvar Receita no Catálogo</button>
-                        <button type="button" id="btn-cancelar-edicao" class="btn-danger" style="flex: 1; display: none;">❌ Cancelar</button>
+                        <button type="button" id="btn-salvar-receita" class="btn-primary" style="flex: 2;">💾 Salvar
+                            Receita no Catálogo</button>
+                        <button type="button" id="btn-cancelar-edicao" class="btn-danger"
+                            style="flex: 1; display: none;">❌ Cancelar</button>
                     </div>
                 </div>
             </div>
@@ -126,19 +162,25 @@
         <!-- ABA 2: CATÁLOGO DE PRODUTOS SALVOS -->
         <div id="tab-catalogo" class="tab-content">
             <h1>Catálogo de Receitas</h1>
-            <div class="card card-alt"><div id="lista-catalogo" class="grid-list"></div></div>
+            <div class="card card-alt">
+                <div id="lista-catalogo" class="grid-list"></div>
+            </div>
         </div>
 
         <!-- ABA 3: FÁBRICA E DESCARTES -->
         <div id="tab-fabrica" class="tab-content">
             <h1>Chão de Fábrica</h1>
-            
+
             <div class="card" style="border-color: var(--success);">
                 <h2 style="color: var(--success);">📦 Registrar Fornada Concluída</h2>
                 <form id="form-producao">
                     <div class="form-row">
-                        <div class="form-col" style="flex: 3;"><label>Escolha o Projeto (Receita):</label><select id="prod-receita" required><option value="">Selecione um produto salvo...</option></select></div>
-                        <div class="form-col" style="flex: 1;"><label>Unidades Fabricadas (Total):</label><input type="number" id="prod-qtd" min="1" step="1" value="1" required></div>
+                        <div class="form-col" style="flex: 3;"><label>Escolha o Projeto (Receita):</label><select
+                                id="prod-receita" required>
+                                <option value="">Selecione um produto salvo...</option>
+                            </select></div>
+                        <div class="form-col" style="flex: 1;"><label>Unidades Fabricadas (Total):</label><input
+                                type="number" id="prod-qtd" min="1" step="1" value="1" required></div>
                     </div>
                     <button type="submit" class="btn-success">Processar Lote</button>
                 </form>
@@ -163,28 +205,47 @@
                     <fieldset id="desc-filamentos-fieldset">
                         <legend>Filamentos Desperdiçados</legend>
                         <div class="form-row">
-                            <div class="form-col" style="flex: 2;"><label>Cor 1 (Obrigatória):</label><select id="desc-filamento-1" required><option value="">Selecione no Inventário...</option></select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-1" step="0.1" required></div>
+                            <div class="form-col" style="flex: 2;"><label>Cor 1 (Obrigatória):</label><select
+                                    id="desc-filamento-1" required>
+                                    <option value="">Selecione no Inventário...</option>
+                                </select></div>
+                            <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-1"
+                                    step="0.1" required></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-col" style="flex: 2;"><label>Cor 2 (Opcional):</label><select id="desc-filamento-2"><option value="">Nenhum...</option></select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-2" step="0.1" placeholder="0"></div>
+                            <div class="form-col" style="flex: 2;"><label>Cor 2 (Opcional):</label><select
+                                    id="desc-filamento-2">
+                                    <option value="">Nenhum...</option>
+                                </select></div>
+                            <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-2"
+                                    step="0.1" placeholder="0"></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-col" style="flex: 2;"><label>Cor 3 (Opcional):</label><select id="desc-filamento-3"><option value="">Nenhum...</option></select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-3" step="0.1" placeholder="0"></div>
+                            <div class="form-col" style="flex: 2;"><label>Cor 3 (Opcional):</label><select
+                                    id="desc-filamento-3">
+                                    <option value="">Nenhum...</option>
+                                </select></div>
+                            <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-3"
+                                    step="0.1" placeholder="0"></div>
                         </div>
                         <div class="form-row">
-                            <div class="form-col" style="flex: 2;"><label>Cor 4 (Opcional):</label><select id="desc-filamento-4"><option value="">Nenhum...</option></select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-4" step="0.1" placeholder="0"></div>
+                            <div class="form-col" style="flex: 2;"><label>Cor 4 (Opcional):</label><select
+                                    id="desc-filamento-4">
+                                    <option value="">Nenhum...</option>
+                                </select></div>
+                            <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-4"
+                                    step="0.1" placeholder="0"></div>
                         </div>
                     </fieldset>
 
                     <fieldset id="desc-insumo-fieldset" style="display: none; border-color: var(--primary);">
                         <legend>Insumo / Acessório Desperdiçado</legend>
                         <div class="form-row">
-                            <div class="form-col" style="flex: 2;"><label>Insumo:</label><select id="desc-insumo"><option value="">Selecione...</option></select></div>
-                            <div class="form-col"><label>Quantidade Perdida:</label><input type="number" id="desc-insumo-qtd" step="0.01"></div>
+                            <div class="form-col" style="flex: 2;"><label>Insumo:</label><select id="desc-insumo">
+                                    <option value="">Selecione...</option>
+                                </select></div>
+                            <div class="form-col"><label>Quantidade Perdida:</label><input type="number"
+                                    id="desc-insumo-qtd" step="0.01"></div>
                         </div>
                     </fieldset>
 
@@ -207,17 +268,23 @@
                             </div>
                         </div>
                         <div class="form-row" style="margin-bottom: 0;">
-                            <div class="form-col"><label>Horas:</label><input type="number" id="desc-horas" min="0" value="0"></div>
-                            <div class="form-col"><label>Minutos:</label><input type="number" id="desc-min" min="0" max="59" value="0"></div>
-                            <div class="form-col"><label>kW:</label><input type="number" id="desc-kw" step="0.001" value="0.095"></div>
-                            <div class="form-col"><label>R$/kWh:</label><input type="number" id="desc-preco-kwh" step="0.01" value="0.95"></div>
+                            <div class="form-col"><label>Horas:</label><input type="number" id="desc-horas" min="0"
+                                    value="0"></div>
+                            <div class="form-col"><label>Minutos:</label><input type="number" id="desc-min" min="0"
+                                    max="59" value="0"></div>
+                            <div class="form-col"><label>kW:</label><input type="number" id="desc-kw" step="0.001"
+                                    value="0.095"></div>
+                            <div class="form-col"><label>R$/kWh:</label><input type="number" id="desc-preco-kwh"
+                                    step="0.01" value="0.95"></div>
                         </div>
                     </fieldset>
 
                     <div class="form-row">
-                        <div class="form-col"><label>Motivo (Opcional):</label><input type="text" id="desc-motivo" placeholder="Ex: Falha de aderência, espaguete"></div>
+                        <div class="form-col"><label>Motivo (Opcional):</label><input type="text" id="desc-motivo"
+                                placeholder="Ex: Falha de aderência, espaguete"></div>
                     </div>
-                    <button type="submit" style="background-color: var(--warning); color: #000;">Registrar Perda</button>
+                    <button type="submit" style="background-color: var(--warning); color: #000;">Registrar
+                        Perda</button>
                 </form>
             </div>
         </div>
@@ -225,64 +292,101 @@
         <!-- ABA 4: INVENTÁRIO -->
         <div id="tab-inv" class="tab-content">
             <h1>Inventário e Localização</h1>
-            
+
             <div class="card">
                 <h2>➕ Novo Rolo de Filamento</h2>
                 <form id="form-filamento">
                     <div class="form-row">
-                        <div class="form-col" style="flex: 2;"><label>Material e Cor:</label><input type="text" id="fil-nome" required placeholder="Ex: PLA Preto eSun"></div>
-                        <div class="form-col"><label>Onde está? (Localização):</label><input type="text" id="fil-local" required placeholder="Ex: Prateleira, A1 Slot 1..." value="Prateleira"></div>
+                        <div class="form-col" style="flex: 2;"><label>Material e Cor:</label><input type="text"
+                                id="fil-nome" required placeholder="Ex: PLA Preto eSun"></div>
+                        <div class="form-col"><label>Onde está? (Localização):</label><input type="text" id="fil-local"
+                                required placeholder="Ex: Prateleira, A1 Slot 1..." value="Prateleira"></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-col"><label>Peso do Rolo (g):</label><input type="number" id="fil-peso" step="1" required placeholder="Ex: 1000"></div>
-                        <div class="form-col"><label>Preço Pago (R$):</label><input type="number" id="fil-preco" step="0.01" required placeholder="Ex: 119.90"></div>
+                        <div class="form-col"><label>Peso do Rolo (g):</label><input type="number" id="fil-peso"
+                                step="1" required placeholder="Ex: 1000"></div>
+                        <div class="form-col"><label>Preço Pago (R$):</label><input type="number" id="fil-preco"
+                                step="0.01" required placeholder="Ex: 119.90"></div>
                     </div>
                     <button type="submit">Cadastrar Filamento (Gerar Lote ID)</button>
                 </form>
             </div>
-            
-            <div class="card card-alt"><h3>Meus Filamentos (Por Lote)</h3><div id="lista-filamentos" class="grid-list"></div></div>
-            
+
+            <div class="card card-alt">
+                <h3>Meus Filamentos (Por Lote)</h3>
+                <div id="lista-filamentos" class="grid-list"></div>
+            </div>
+
             <hr>
-            
+
             <div class="card">
                 <h2>➕ Novo Insumo / Acessório</h2>
                 <form id="form-extra">
                     <div class="form-row">
-                        <div class="form-col" style="flex: 2;"><label>Nome:</label><input type="text" id="ext-nome" required></div>
-                        <div class="form-col"><label>Medido em:</label><select id="ext-medida"><option value="Unidades">Unidades</option><option value="Metros">Metros (m)</option><option value="Centímetros">Centímetros (cm)</option></select></div>
+                        <div class="form-col" style="flex: 2;"><label>Nome:</label><input type="text" id="ext-nome"
+                                required></div>
+                        <div class="form-col"><label>Medido em:</label><select id="ext-medida">
+                                <option value="Unidades">Unidades</option>
+                                <option value="Metros">Metros (m)</option>
+                                <option value="Centímetros">Centímetros (cm)</option>
+                            </select></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-col"><label>Quantidade Comprada:</label><input type="number" id="ext-qtd" step="0.01" required placeholder="Ex: 100"></div>
-                        <div class="form-col"><label>Preço Pago (R$):</label><input type="number" id="ext-preco" step="0.01" required placeholder="Ex: 25.00"></div>
+                        <div class="form-col"><label>Quantidade Comprada:</label><input type="number" id="ext-qtd"
+                                step="0.01" required placeholder="Ex: 100"></div>
+                        <div class="form-col"><label>Preço Pago (R$):</label><input type="number" id="ext-preco"
+                                step="0.01" required placeholder="Ex: 25.00"></div>
                     </div>
                     <button type="submit">Cadastrar Insumo</button>
                 </form>
             </div>
-            <div class="card card-alt"><h3>Meus Insumos</h3><div id="lista-extras" class="grid-list"></div></div>
+            <div class="card card-alt">
+                <h3>Meus Insumos</h3>
+                <div id="lista-extras" class="grid-list"></div>
+            </div>
         </div>
 
         <!-- ABA 5: VENDAS -->
         <div id="tab-vendas" class="tab-content">
             <h1>Estoque Pronto & Vendas</h1>
-            <div class="card card-alt"><h3>📦 Produtos Disponíveis</h3><div id="lista-estoque-prontos" class="grid-list"></div></div>
+            <div class="card card-alt">
+                <h3>📦 Produtos Disponíveis</h3>
+                <div id="lista-estoque-prontos" class="grid-list"></div>
+            </div>
             <div class="card" style="border-color: var(--primary);">
                 <h2>💰 Registrar Nova Venda</h2>
                 <form id="form-venda">
                     <div class="form-row">
-                        <div class="form-col" style="flex: 2;"><label>Produto Vendido:</label><select id="venda-produto" required><option value="">Selecione no estoque...</option></select></div>
-                        <div class="form-col"><label>Qtd Vendida:</label><input type="number" id="venda-qtd" min="1" step="1" value="1" required></div>
+                        <div class="form-col" style="flex: 2;"><label>Produto Vendido:</label><select id="venda-produto"
+                                required>
+                                <option value="">Selecione no estoque...</option>
+                            </select></div>
+                        <div class="form-col"><label>Qtd Vendida:</label><input type="number" id="venda-qtd" min="1"
+                                step="1" value="1" required></div>
                     </div>
                     <div class="form-row">
-                        <div class="form-col"><label>Canal:</label><select id="venda-canal" required><option value="Varejo">Varejo</option><option value="Atacado">Atacado</option><option value="Shopee">Shopee</option></select></div>
-                        <div class="form-col"><label>Preço de Venda Un. (R$):</label><input type="number" id="venda-preco" step="0.01" required>
-                            <div id="sugestao-preco-container" style="font-size: 0.85rem; margin-top: 0.4rem; display: none;">💡 Sugerido: <span id="sugestao-preco-valor" style="color: var(--success); font-weight: bold; cursor: pointer; text-decoration: underline;">R$ 0,00</span></div>
+                        <div class="form-col"><label>Canal:</label><select id="venda-canal" required>
+                                <option value="Varejo">Varejo</option>
+                                <option value="Atacado">Atacado</option>
+                                <option value="Shopee">Shopee</option>
+                            </select></div>
+                        <div class="form-col"><label>Preço de Venda Un. (R$):</label><input type="number"
+                                id="venda-preco" step="0.01" required>
+                            <div id="sugestao-preco-container"
+                                style="font-size: 0.85rem; margin-top: 0.4rem; display: none;">💡 Sugerido: <span
+                                    id="sugestao-preco-valor"
+                                    style="color: var(--success); font-weight: bold; cursor: pointer; text-decoration: underline;">R$
+                                    0,00</span></div>
                         </div>
                     </div>
-                    <div id="prev-venda" style="background: var(--bg-input); padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border: 1px dashed var(--border);">
-                        <div class="res-row"><span>Custo Fab. Total:</span> <strong id="prev-custo">R$ 0,00</strong></div>
-                        <div class="res-row"><span>Taxas:</span> <strong id="prev-taxa" class="text-danger">R$ 0,00</strong></div>
-                        <div class="res-row destaque"><span>LUCRO LÍQUIDO:</span> <strong id="prev-lucro">R$ 0,00</strong></div>
+                    <div id="prev-venda"
+                        style="background: var(--bg-input); padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border: 1px dashed var(--border);">
+                        <div class="res-row"><span>Custo Fab. Total:</span> <strong id="prev-custo">R$ 0,00</strong>
+                        </div>
+                        <div class="res-row"><span>Taxas:</span> <strong id="prev-taxa" class="text-danger">R$
+                                0,00</strong></div>
+                        <div class="res-row destaque"><span>LUCRO LÍQUIDO:</span> <strong id="prev-lucro">R$
+                                0,00</strong></div>
                     </div>
                     <button type="submit" style="width: 100%;">💲 Confirmar Venda</button>
                 </form>
@@ -292,18 +396,50 @@
         <!-- ABA 6: HISTÓRICO GERAL -->
         <div id="tab-hist" class="tab-content">
             <h1>Painel Financeiro & Relatórios</h1>
-            <div class="card" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; background: #161616; border: 1px solid var(--border); margin-bottom: 2rem;">
-                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);"><span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">ENTROU (LÍQUIDO)</span><h2 id="dash-entrou" class="text-success" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2></div>
-                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);"><span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">TOTAL SAIU</span><h2 id="dash-saiu" class="text-danger" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2></div>
-                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);"><span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">LUCRO REAL</span><h2 id="dash-lucro" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2></div>
-                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; overflow: hidden;"><span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">META INVEST.</span><h2 style="margin-top: 0.5rem; color: var(--warning); font-size: 1.25rem; white-space: nowrap;">R$ 15.703,00</h2></div>
-                <div style="text-align: center; padding: 0.5rem;"><span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">LUZ PENDENTE</span><h2 id="dash-energia" style="margin-top: 0.5rem; color: #ffeb3b; font-size: 1.4rem;">R$ 0,00</h2><button id="btn-pagar-energia" style="margin-top: 0.5rem; background: #ffeb3b; color: #000; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; padding: 0.3rem;">💸 Pagar Luz</button></div>
+            <div class="card"
+                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; background: #161616; border: 1px solid var(--border); margin-bottom: 2rem;">
+                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);"><span
+                        style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">ENTROU (LÍQUIDO)</span>
+                    <h2 id="dash-entrou" class="text-success" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00
+                    </h2>
+                </div>
+                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);"><span
+                        style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">TOTAL SAIU</span>
+                    <h2 id="dash-saiu" class="text-danger" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
+                </div>
+                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);"><span
+                        style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">LUCRO REAL</span>
+                    <h2 id="dash-lucro" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
+                </div>
+                <div
+                    style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">META INVEST.</span>
+                    <h2 style="margin-top: 0.5rem; color: var(--warning); font-size: 1.25rem; white-space: nowrap;">R$
+                        15.703,00</h2>
+                </div>
+                <div style="text-align: center; padding: 0.5rem;"><span
+                        style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">LUZ PENDENTE</span>
+                    <h2 id="dash-energia" style="margin-top: 0.5rem; color: #ffeb3b; font-size: 1.4rem;">R$ 0,00</h2>
+                    <button id="btn-pagar-energia"
+                        style="margin-top: 0.5rem; background: #ffeb3b; color: #000; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; padding: 0.3rem;">💸
+                        Pagar Luz</button>
+                </div>
             </div>
-            <div class="card card-alt" style="margin-bottom: 2rem;"><h3 style="color: var(--success);">📈 Vendas</h3><div id="lista-historico-vendas" style="display: flex; flex-direction: column; gap: 1rem;"></div></div>
-            <div class="card card-alt" style="margin-bottom: 2rem;"><h3 style="color: var(--primary);">⚙️ Produção</h3><div id="lista-historico-producao" style="display: flex; flex-direction: column; gap: 1rem;"></div></div>
-            <div class="card card-alt" style="border-left: 4px solid var(--warning);"><h3 style="color: var(--warning);">🗑️ Perdas e Descartes</h3><div id="lista-historico-perdas" style="display: flex; flex-direction: column; gap: 1rem;"></div></div>
+            <div class="card card-alt" style="margin-bottom: 2rem;">
+                <h3 style="color: var(--success);">📈 Vendas</h3>
+                <div id="lista-historico-vendas" style="display: flex; flex-direction: column; gap: 1rem;"></div>
+            </div>
+            <div class="card card-alt" style="margin-bottom: 2rem;">
+                <h3 style="color: var(--primary);">⚙️ Produção</h3>
+                <div id="lista-historico-producao" style="display: flex; flex-direction: column; gap: 1rem;"></div>
+            </div>
+            <div class="card card-alt" style="border-left: 4px solid var(--warning);">
+                <h3 style="color: var(--warning);">🗑️ Perdas e Descartes</h3>
+                <div id="lista-historico-perdas" style="display: flex; flex-direction: column; gap: 1rem;"></div>
+            </div>
         </div>
     </div>
     <script src="script.js"></script>
 </body>
+
 </html>
