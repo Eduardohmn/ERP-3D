@@ -112,6 +112,20 @@
                         </div>
                     </fieldset>
 
+                    <fieldset style="border-color: var(--primary);">
+                        <legend>📷 Foto do Produto (Para a Vitrine)</legend>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label>Selecione a imagem (PNG, JPG):</label>
+                                <input type="file" id="calc-foto" accept="image/*">
+                                <div id="foto-preview-container" style="margin-top: 10px; display: none; text-align: center; background: var(--bg-input); padding: 10px; border-radius: 6px;">
+                                    <img id="foto-preview" src="" style="max-width: 150px; max-height: 150px; border-radius: 4px; border: 1px solid var(--border); object-fit: cover;">
+                                    <p id="foto-url-texto" style="font-size: 0.8rem; color: var(--success); margin-top: 5px; font-weight: bold;"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </fieldset>
+
                     <button type="submit" style="width: 100%;">💡 Simular Custos</button>
                 </form>
 

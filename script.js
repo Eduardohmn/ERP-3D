@@ -88,6 +88,73 @@ async function iniciarApp() {
     await iniciarNuvem(); atualizarSelectsDinamicos(); atualizarSelectProducao(); renderizarInventario(); renderizarCatalogo(); renderizarAbaVendas(); renderizarHistoricos();
 }
 
+// --- INTEGRAÇÃO COM IMGBB (FOTOS) ---
+let IMGBB_API_KEY = localStorage.getItem('imgbb_api_key');
+let fotoUrlAtual = "";
+
+async function uploadParaImgBB(file) {
+    if (!IMGBB_API_KEY) {
+        const key = prompt("☁️ Cole a sua API Key do ImgBB:");
+        if (key && key.trim() !== "") {
+            IMGBB_API_KEY = key.trim();
+            localStorage.setItem('imgbb_api_key', IMGBB_API_KEY);
+        } else {
+            alert("Upload cancelado. Chave inválida.");
+            return null;
+        }
+    }
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+        const resposta = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+            method: 'POST',
+            body: formData
+        });
+        
+        const dados = await resposta.json();
+        
+        if (dados.success) {
+            return dados.data.url; // O link direto e permanente da imagem!
+        } else {
+            throw new Error(dados.error.message);
+        }
+        
+    } catch (e) {
+        console.error(e);
+        alert("Erro no upload. Verifique se a sua API Key está correta.");
+        localStorage.removeItem('imgbb_api_key');
+        IMGBB_API_KEY = null;
+        return null;
+    }
+}
+
+const inputFoto = document.getElementById('calc-foto');
+if (inputFoto) {
+    inputFoto.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if(!file) return;
+        
+        document.getElementById('foto-url-texto').textContent = "Enviando para o ImgBB... ⏳";
+        document.getElementById('foto-url-texto').className = "text-warning";
+        document.getElementById('foto-preview-container').style.display = 'block';
+        document.getElementById('foto-preview').src = "";
+        
+        const url = await uploadParaImgBB(file);
+        
+        if(url) {
+            fotoUrlAtual = url;
+            document.getElementById('foto-preview').src = url;
+            document.getElementById('foto-url-texto').textContent = "✅ Imagem salva com sucesso!";
+            document.getElementById('foto-url-texto').className = "text-success";
+        } else {
+            document.getElementById('foto-preview-container').style.display = 'none';
+            e.target.value = "";
+        }
+    });
+}
+
 // --- NAVEGAÇÃO ---
 document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -317,9 +384,11 @@ document.getElementById('form-calc').addEventListener('submit', (e) => {
     document.getElementById('res-shopee-m3').textContent = fmtDinheiro(shopeeM3); document.getElementById('res-shopee-m5').textContent = fmtDinheiro(shopeeM5);
     document.getElementById('sim-shopee-preco').value = shopeeM5.toFixed(2);
 
-    simulacaoAtual = {
+    simulacaoAtual = { 
         id: editandoReceitaId || Date.now(), lastModified: Date.now(),
-        nome: nomeProduto, impressora: impressoraUsada, custoUnitario, custoTotalFornada, rende, filamentosUsados, extrasUsados, params: { h, m, kw, precoKwh }
+        nome: nomeProduto, impressora: impressoraUsada, custoUnitario, custoTotalFornada, rende, 
+        filamentosUsados, extrasUsados, params: { h, m, kw, precoKwh },
+        fotoUrl: fotoUrlAtual // <-- Foto adicionada aqui!
     };
     atualizarSimulacaoShopee(shopeeM5, custoUnitario);
     document.getElementById('painel-resultados').style.display = 'block';
@@ -349,6 +418,11 @@ document.getElementById('btn-cancelar-edicao').addEventListener('click', () => {
 function resetarSimulacao() {
     document.getElementById('painel-resultados').style.display = 'none'; document.getElementById('form-calc').reset();
     document.getElementById('btn-salvar-receita').innerHTML = "💾 Salvar Receita no Catálogo"; document.getElementById('btn-cancelar-edicao').style.display = 'none';
+    fotoUrlAtual = "";
+    const container = document.getElementById('foto-preview-container');
+    if(container) container.style.display = 'none';
+    const inputF = document.getElementById('calc-foto');
+    if(inputF) inputF.value = "";
     simulacaoAtual = null; editandoReceitaId = null; atualizarKWMaquina('calc');
 }
 
@@ -379,6 +453,17 @@ function editarReceita(id) {
     if (r.extrasUsados) { r.extrasUsados.forEach(eUsado => { const input = document.querySelector(`.calc-ext-uso[data-id="${eUsado.id}"]`); if (input) input.value = eUsado.qtd; }); }
 
     editandoReceitaId = r.id; document.getElementById('btn-salvar-receita').innerHTML = "💾 Atualizar Receita"; document.getElementById('btn-cancelar-edicao').style.display = 'block';
+    if(r.fotoUrl) {
+        fotoUrlAtual = r.fotoUrl;
+        document.getElementById('foto-preview-container').style.display = 'block';
+        document.getElementById('foto-preview').src = r.fotoUrl;
+        document.getElementById('foto-url-texto').textContent = "Imagem atual vinculada";
+        document.getElementById('foto-url-texto').className = "text-success";
+    } else {
+        fotoUrlAtual = "";
+        document.getElementById('foto-preview-container').style.display = 'none';
+        document.getElementById('calc-foto').value = "";
+    }
     document.getElementById('form-calc').dispatchEvent(new Event('submit'));
 }
 
