@@ -15,6 +15,40 @@ let simulacaoAtual = null; let editandoReceitaId = null;
 let GITHUB_TOKEN = localStorage.getItem('github_token');
 let GIST_ID = localStorage.getItem('gist_id');
 
+// =======================================================================
+// 🔄 SISTEMA DE VERIFICAÇÃO DE VERSÃO (ANTI-CACHE E CONFLITOS)
+// =======================================================================
+const VERSAO_ATUAL = "1.0.0"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
+const INTERVALO_VERIFICACAO = 3 * 60 * 1000; // 3 minutos (em milissegundos)
+
+async function verificarAtualizacao() {
+    try {
+        // O "?t=" com a data atual engana o cache do navegador e força a leitura na nuvem
+        const resposta = await fetch(`versao.json?t=${Date.now()}`);
+        if (!resposta.ok) return;
+        
+        const dadosNuvem = await resposta.json();
+        
+        if (dadosNuvem.versao !== VERSAO_ATUAL) {
+            // Se a versão do servidor for diferente da aba aberta, trava a tela!
+            const alerta = "⚠️ ATUALIZAÇÃO IMPORTANTE!\n\nUma nova versão do sistema foi detectada (ou alguém salvou dados novos). \n\nPara evitar que você apague o trabalho da equipe, a página precisa ser atualizada. Clique em OK para recarregar.";
+            
+            // Usamos alert e reload forçado para o usuário não ter a chance de ignorar e salvar por cima
+            alert(alerta);
+            window.location.reload(true); 
+        }
+    } catch (erro) {
+        console.log("Falha ao checar versão (Você pode estar sem internet).", erro);
+    }
+}
+
+// Dispara o vigia de tempo em tempo
+setInterval(verificarAtualizacao, INTERVALO_VERIFICACAO);
+
+// Chama uma vez assim que o sistema abre, só por garantia
+setTimeout(verificarAtualizacao, 5000); 
+// =======================================================================
+
 async function iniciarNuvem() {
     if (!GITHUB_TOKEN || !GIST_ID) {
         const inputDados = prompt("☁️ Cole as chaves (Token + ID Gist):");
@@ -42,45 +76,75 @@ async function iniciarNuvem() {
     } catch (error) { console.error("Erro nuvem:", error); }
 }
 
+// --- MOTOR DE SINCRONIZAÇÃO DE SEGURANÇA ---
+function mesclarBancosDeDados(dbNuvem, dbLocal) {
+    const categorias = [
+        'filamentos', 'extras', 'receitas', 'estoqueProntos', 
+        'historicoProducao', 'historicoVendas', 'historicoPerdas', 'historicoGastos'
+    ];
+    let bancoAtualizado = { energiaAcumulada: dbLocal.energiaAcumulada || dbNuvem.energiaAcumulada || 0 };
+
+    categorias.forEach(categoria => {
+        let itensNuvem = dbNuvem[categoria] || [];
+        let itensLocais = dbLocal[categoria] || [];
+        
+        // 1. Cria um mapa dos itens que já estão no GitHub usando o ID
+        let mapa = new Map();
+        itensNuvem.forEach(item => mapa.set(item.id, item));
+        
+        // 2. Injeta as alterações que você fez na sua tela
+        itensLocais.forEach(itemLocal => {
+            if (mapa.has(itemLocal.id)) {
+                let itemNuvem = mapa.get(itemLocal.id);
+                
+                // Se ambos têm a propriedade lastModified, o mais recente vence
+                if (itemLocal.lastModified && itemNuvem.lastModified) {
+                    if (itemLocal.lastModified > itemNuvem.lastModified) {
+                        mapa.set(itemLocal.id, itemLocal);
+                    }
+                } else {
+                    // Sem registro de tempo, damos prioridade para a tela atual
+                    mapa.set(itemLocal.id, itemLocal);
+                }
+            } else {
+                // Se o ID não existe na nuvem, é um cadastro novo feito por você!
+                mapa.set(itemLocal.id, itemLocal);
+            }
+        });
+        
+        // 3. Converte de volta para array
+        bancoAtualizado[categoria] = Array.from(mapa.values());
+    });
+
+    return bancoAtualizado;
+}
+
 async function salvarDB() {
     if (!GITHUB_TOKEN || !GIST_ID) { localStorage.setItem('db_backup', JSON.stringify(DB)); return; }
     try {
-        const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Authorization': `token ${GITHUB_TOKEN}` } });
-        const data = await res.json(); const cloudDB = JSON.parse(data.files['database.json'].content);
+        // --- 1. PASSO DE SEGURANÇA: BAIXA A VERSÃO DO Gist PRIMEIRO ---
+        const respostaGet = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Authorization': `token ${GITHUB_TOKEN}` } });
+        if (!respostaGet.ok) throw new Error('Falha ao obter Gist remoto.');
+        const dadosGist = await respostaGet.json();
+        const dbNuvem = (dadosGist && dadosGist.files && dadosGist.files['database.json'] && dadosGist.files['database.json'].content) ? JSON.parse(dadosGist.files['database.json'].content) : {};
 
-        const mergeInteligente = (localArr, cloudArr) => {
-            let result = [];
-            const localMap = new Map(localArr.map(i => [i.id, i])); const cloudMap = new Map(cloudArr.map(i => [i.id, i]));
-            for (let [id, localItem] of localMap) {
-                const cloudItem = cloudMap.get(id);
-                if (cloudItem) {
-                    const tLocal = localItem.lastModified || localItem.id; const tCloud = cloudItem.lastModified || cloudItem.id;
-                    result.push(tLocal >= tCloud ? localItem : cloudItem);
-                } else { result.push(localItem); }
-            }
-            for (let [id, cloudItem] of cloudMap) {
-                if (!localMap.has(id)) {
-                    const itemTime = cloudItem.lastModified || cloudItem.id;
-                    if (itemTime >= syncTimeLocal) result.push(cloudItem);
-                }
-            }
-            return result;
-        };
+        // --- 2. PASSO DE SEGURANÇA: MESCLA OS BANCOS USANDO O MOTOR DE SEGURANÇA ---
+        DB = mesclarBancosDeDados(dbNuvem, DB);
 
-        DB.filamentos = mergeInteligente(DB.filamentos, cloudDB.filamentos || []); DB.extras = mergeInteligente(DB.extras, cloudDB.extras || []);
-        DB.receitas = mergeInteligente(DB.receitas, cloudDB.receitas || []); DB.estoqueProntos = mergeInteligente(DB.estoqueProntos, cloudDB.estoqueProntos || []);
-        DB.historicoVendas = mergeInteligente(DB.historicoVendas, cloudDB.historicoVendas || []); DB.historicoProducao = mergeInteligente(DB.historicoProducao, cloudDB.historicoProducao || []);
-        DB.historicoPerdas = mergeInteligente(DB.historicoPerdas, cloudDB.historicoPerdas || []); DB.historicoGastos = mergeInteligente(DB.historicoGastos, cloudDB.historicoGastos || []);
-
+        // Atualiza timestamp e backup local antes de enviar
         syncTimeLocal = Date.now(); localStorage.setItem('db_backup', JSON.stringify(DB));
 
-        await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-            method: 'PATCH', headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
+        // --- 3. SALVAMENTO REAL (PATCH) ---
+        const respostaPatch = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
             body: JSON.stringify({ files: { 'database.json': { content: JSON.stringify(DB) } } })
         });
 
+        if (!respostaPatch.ok) throw new Error('Erro ao salvar no GitHub.');
+
         atualizarSelectsDinamicos(); atualizarSelectProducao(); renderizarInventario(); renderizarCatalogo(); renderizarAbaVendas(); renderizarHistoricos();
-    } catch (e) { console.error("Falha sync:", e); }
+    } catch (e) { console.error('Falha sync:', e); }
 }
 
 async function iniciarApp() {
