@@ -594,7 +594,8 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
         if (receita.extrasUsados) custoInsumosUnitario = receita.extrasUsados.reduce((acc, ex) => acc + (ex.qtd * ex.custoRef), 0) / rendePadrao;
         custoPerda = descontarInsumosDaPerda ? (receita.custoUnitario * qtdPerdida) : Math.max(0, (receita.custoUnitario - custoInsumosUnitario) * qtdPerdida);
         const energiaUnitario = energiaFornada / rendePadrao;
-        custoGastoImediato = Math.max(0, custoPerda - (energiaUnitario * qtdPerdida));
+        // O caixa só perde dinheiro novo com a energia. O material já foi pago na compra.
+        custoGastoImediato = energiaUnitario * qtdPerdida;
 
         DB.historicoPerdas.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), tipo: "Descarte de Produção", filamentoNome: receita.nome, pesoGasto: qtdPerdida, tempoGasto: "N/A", custoTotal: custoPerda, motivo: descontarInsumosDaPerda ? "Falha no lote (insumos perdidos)" : "Falha no lote (insumos salvos)" });
         DB.historicoGastos.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Perda (Produção): ${receita.nome}`, valor: custoGastoImediato });
@@ -642,7 +643,9 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
         const custoEletrico = ((horas + (min / 60)) * kw * kwh);
         DB.energiaAcumulada = (DB.energiaAcumulada || 0) + custoEletrico;
 
-        custoTotalPerda = custoMateriais + custoEletrico; custoGastoImediato = custoMateriais;
+        custoTotalPerda = custoMateriais + custoEletrico;
+        // O caixa só perde dinheiro novo com a energia. O material já foi pago na compra.
+        custoGastoImediato = custoEletrico;
         materialNome = detalhesNomes.join(' + ') + ` [${impressora}]`;
         motivo += ` (Tempo: ${horas}h ${min}m)`;
         filamentosUsados.forEach(uso => { uso.fil.pesoRestante -= uso.peso; uso.fil.lastModified = Date.now(); });
