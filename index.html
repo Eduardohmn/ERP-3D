@@ -18,6 +18,7 @@
         <button class="tab-btn" data-tab="tab-inv">4. Inventário</button>
         <button class="tab-btn" data-tab="tab-vendas">5. Vendas</button>
         <button class="tab-btn" data-tab="tab-hist">6. Histórico</button>
+        <button class="tab-btn" data-tab="tab-vitrine">7. 🛍️ Vitrine & Mídia</button>
     </nav>
 
     <div class="container">
@@ -450,6 +451,23 @@
             <div class="card card-alt" style="border-left: 4px solid var(--warning);">
                 <h3 style="color: var(--warning);">🗑️ Perdas e Descartes</h3>
                 <div id="lista-historico-perdas" style="display: flex; flex-direction: column; gap: 1rem;"></div>
+            </div>
+        </div>
+
+        <!-- ABA 7: GESTÃO DA VITRINE -->
+        <div id="tab-vitrine" class="tab-content">
+            <div class="flex-between" style="margin-bottom: 1rem;">
+                <h1>Gestão de Vitrine & Mídia</h1>
+                <span id="vitrine-contador" class="badge" style="background: var(--primary); font-size: 0.9rem;">0 visíveis na vitrine</span>
+            </div>
+            
+            <p class="ajuda">Escolha quais receitas ativas aparecem no seu catálogo visual e gerencie as fotos do ImgBB.</p>
+            
+            <!-- Input oculto para upload rápido de foto sem recarregar a tela -->
+            <input type="file" id="vitrine-input-upload" accept="image/*" style="display: none;">
+            
+            <div class="card card-alt">
+                <div id="lista-vitrine" class="grid-list"></div>
             </div>
         </div>
     </div>

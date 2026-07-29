@@ -18,7 +18,7 @@ let GIST_ID = localStorage.getItem('gist_id');
 // =======================================================================
 // 🔄 SISTEMA DE VERIFICAÇÃO DE VERSÃO (ANTI-CACHE E CONFLITOS)
 // =======================================================================
-const VERSAO_ATUAL = "1.0.2"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
+const VERSAO_ATUAL = "1.0.3"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
 const INTERVALO_VERIFICACAO = 3 * 60 * 1000; // 3 minutos (em milissegundos)
 
 async function verificarAtualizacao() {
@@ -26,16 +26,16 @@ async function verificarAtualizacao() {
         // O "?t=" com a data atual engana o cache do navegador e força a leitura na nuvem
         const resposta = await fetch(`versao.json?t=${Date.now()}`);
         if (!resposta.ok) return;
-        
+
         const dadosNuvem = await resposta.json();
-        
+
         if (dadosNuvem.versao !== VERSAO_ATUAL) {
             // Se a versão do servidor for diferente da aba aberta, trava a tela!
             const alerta = "⚠️ ATUALIZAÇÃO IMPORTANTE!\n\nUma nova versão do sistema foi detectada (ou alguém salvou dados novos). \n\nPara evitar que você apague o trabalho da equipe, a página precisa ser atualizada. Clique em OK para recarregar.";
-            
+
             // Usamos alert e reload forçado para o usuário não ter a chance de ignorar e salvar por cima
             alert(alerta);
-            window.location.reload(true); 
+            window.location.reload(true);
         }
     } catch (erro) {
         console.log("Falha ao checar versão (Você pode estar sem internet).", erro);
@@ -46,7 +46,7 @@ async function verificarAtualizacao() {
 setInterval(verificarAtualizacao, INTERVALO_VERIFICACAO);
 
 // Chama uma vez assim que o sistema abre, só por garantia
-setTimeout(verificarAtualizacao, 5000); 
+setTimeout(verificarAtualizacao, 5000);
 // =======================================================================
 
 async function iniciarNuvem() {
@@ -79,7 +79,7 @@ async function iniciarNuvem() {
 // --- MOTOR DE SINCRONIZAÇÃO DE SEGURANÇA ---
 function mesclarBancosDeDados(dbNuvem, dbLocal) {
     const categorias = [
-        'filamentos', 'extras', 'receitas', 'estoqueProntos', 
+        'filamentos', 'extras', 'receitas', 'estoqueProntos',
         'historicoProducao', 'historicoVendas', 'historicoPerdas', 'historicoGastos'
     ];
     let bancoAtualizado = { energiaAcumulada: dbLocal.energiaAcumulada || dbNuvem.energiaAcumulada || 0 };
@@ -87,16 +87,16 @@ function mesclarBancosDeDados(dbNuvem, dbLocal) {
     categorias.forEach(categoria => {
         let itensNuvem = dbNuvem[categoria] || [];
         let itensLocais = dbLocal[categoria] || [];
-        
+
         // 1. Cria um mapa dos itens que já estão no GitHub usando o ID
         let mapa = new Map();
         itensNuvem.forEach(item => mapa.set(item.id, item));
-        
+
         // 2. Injeta as alterações que você fez na sua tela
         itensLocais.forEach(itemLocal => {
             if (mapa.has(itemLocal.id)) {
                 let itemNuvem = mapa.get(itemLocal.id);
-                
+
                 // Se ambos têm a propriedade lastModified, o mais recente vence
                 if (itemLocal.lastModified && itemNuvem.lastModified) {
                     if (itemLocal.lastModified > itemNuvem.lastModified) {
@@ -111,7 +111,7 @@ function mesclarBancosDeDados(dbNuvem, dbLocal) {
                 mapa.set(itemLocal.id, itemLocal);
             }
         });
-        
+
         // 3. Converte de volta para array
         bancoAtualizado[categoria] = Array.from(mapa.values());
     });
@@ -143,13 +143,13 @@ async function salvarDB() {
 
         if (!respostaPatch.ok) throw new Error('Erro ao salvar no GitHub.');
 
-        atualizarSelectsDinamicos(); atualizarSelectProducao(); renderizarInventario(); renderizarCatalogo(); renderizarAbaVendas(); renderizarHistoricos();
+        atualizarSelectsDinamicos(); atualizarSelectProducao(); renderizarInventario(); renderizarCatalogo(); renderizarAbaVendas(); renderizarHistoricos(); renderizarVitrine();
     } catch (e) { console.error('Falha sync:', e); }
 }
 
 async function iniciarApp() {
     const backup = localStorage.getItem('db_backup'); if (backup) Object.assign(DB, JSON.parse(backup));
-    await iniciarNuvem(); atualizarSelectsDinamicos(); atualizarSelectProducao(); renderizarInventario(); renderizarCatalogo(); renderizarAbaVendas(); renderizarHistoricos();
+    await iniciarNuvem(); atualizarSelectsDinamicos(); atualizarSelectProducao(); renderizarInventario(); renderizarCatalogo(); renderizarAbaVendas(); renderizarHistoricos(); renderizarVitrine();
 }
 
 // --- INTEGRAÇÃO COM IMGBB (FOTOS) ---
@@ -176,15 +176,15 @@ async function uploadParaImgBB(file) {
             method: 'POST',
             body: formData
         });
-        
+
         const dados = await resposta.json();
-        
+
         if (dados.success) {
             return dados.data.url; // O link direto e permanente da imagem!
         } else {
             throw new Error(dados.error.message);
         }
-        
+
     } catch (e) {
         console.error(e);
         alert("Erro no upload. Verifique se a sua API Key está correta.");
@@ -198,16 +198,16 @@ const inputFoto = document.getElementById('calc-foto');
 if (inputFoto) {
     inputFoto.addEventListener('change', async (e) => {
         const file = e.target.files[0];
-        if(!file) return;
-        
+        if (!file) return;
+
         document.getElementById('foto-url-texto').textContent = "Enviando para o ImgBB... ⏳";
         document.getElementById('foto-url-texto').className = "text-warning";
         document.getElementById('foto-preview-container').style.display = 'block';
         document.getElementById('foto-preview').src = "";
-        
+
         const url = await uploadParaImgBB(file);
-        
-        if(url) {
+
+        if (url) {
             fotoUrlAtual = url;
             document.getElementById('foto-preview').src = url;
             document.getElementById('foto-url-texto').textContent = "✅ Imagem salva com sucesso!";
@@ -448,9 +448,9 @@ document.getElementById('form-calc').addEventListener('submit', (e) => {
     document.getElementById('res-shopee-m3').textContent = fmtDinheiro(shopeeM3); document.getElementById('res-shopee-m5').textContent = fmtDinheiro(shopeeM5);
     document.getElementById('sim-shopee-preco').value = shopeeM5.toFixed(2);
 
-    simulacaoAtual = { 
+    simulacaoAtual = {
         id: editandoReceitaId || Date.now(), lastModified: Date.now(),
-        nome: nomeProduto, impressora: impressoraUsada, custoUnitario, custoTotalFornada, rende, 
+        nome: nomeProduto, impressora: impressoraUsada, custoUnitario, custoTotalFornada, rende,
         filamentosUsados, extrasUsados, params: { h, m, kw, precoKwh },
         fotoUrl: fotoUrlAtual // <-- Foto adicionada aqui!
     };
@@ -484,9 +484,9 @@ function resetarSimulacao() {
     document.getElementById('btn-salvar-receita').innerHTML = "💾 Salvar Receita no Catálogo"; document.getElementById('btn-cancelar-edicao').style.display = 'none';
     fotoUrlAtual = "";
     const container = document.getElementById('foto-preview-container');
-    if(container) container.style.display = 'none';
+    if (container) container.style.display = 'none';
     const inputF = document.getElementById('calc-foto');
-    if(inputF) inputF.value = "";
+    if (inputF) inputF.value = "";
     simulacaoAtual = null; editandoReceitaId = null; atualizarKWMaquina('calc');
 }
 
@@ -517,7 +517,7 @@ function editarReceita(id) {
     if (r.extrasUsados) { r.extrasUsados.forEach(eUsado => { const input = document.querySelector(`.calc-ext-uso[data-id="${eUsado.id}"]`); if (input) input.value = eUsado.qtd; }); }
 
     editandoReceitaId = r.id; document.getElementById('btn-salvar-receita').innerHTML = "💾 Atualizar Receita"; document.getElementById('btn-cancelar-edicao').style.display = 'block';
-    if(r.fotoUrl) {
+    if (r.fotoUrl) {
         fotoUrlAtual = r.fotoUrl;
         document.getElementById('foto-preview-container').style.display = 'block';
         document.getElementById('foto-preview').src = r.fotoUrl;
@@ -741,5 +741,141 @@ document.getElementById('btn-pagar-energia').addEventListener('click', async () 
         DB.energiaAcumulada = 0; await salvarDB(); renderizarHistoricos(); alert("Pagamento registrado!");
     }
 });
+
+// =======================================================================
+// 🛍️ SISTEMA DE GESTÃO DA VITRINE
+// =======================================================================
+
+let idReceitaParaUpload = null;
+
+// Função para renderizar a Vitrine
+function renderizarVitrine() {
+    const elLista = document.getElementById('lista-vitrine');
+    const elContador = document.getElementById('vitrine-contador');
+    if (!elLista) return;
+
+    elLista.innerHTML = '';
+
+    if (DB.receitas.length === 0) {
+        elLista.innerHTML = '<p class="ajuda">Nenhum produto cadastrado nas receitas ainda.</p>';
+        if (elContador) elContador.textContent = "0 visíveis na vitrine";
+        return;
+    }
+
+    let contadorVisiveis = 0;
+
+    // Ordena para mostrar primeiro os que têm foto e estão ativos
+    const receitasOrdenadas = [...DB.receitas].sort((a, b) => {
+        return (b.exibirVitrine === true ? 1 : 0) - (a.exibirVitrine === true ? 1 : 0);
+    });
+
+    receitasOrdenadas.forEach(r => {
+        // Se exibirVitrine nunca foi configurado, assume false
+        const isVisivel = r.exibirVitrine === true;
+        if (isVisivel) contadorVisiveis++;
+
+        const precoSugeridoVarejo = r.custoUnitario * 5; // M5 (Varejo)
+        const precoSugeridoShopee = ((r.custoUnitario * 5) + 4) / 0.8; // Shopee
+
+        // HTML da foto ou placeholder
+        let imagemHtml = r.fotoUrl
+            ? `<img src="${r.fotoUrl}" class="vitrine-img" alt="${r.nome}">`
+            : `<div class="vitrine-placeholder">📷<br>Sem foto cadastrada</div>`;
+
+        const badgeClass = isVisivel ? 'status-ativo' : 'status-inativo';
+        const badgeTexto = isVisivel ? '🟢 Visível' : '⚫ Oculto';
+        const btnTexto = isVisivel ? '👁️ Ocultar da Vitrine' : '✨ Exibir na Vitrine';
+        const btnCor = isVisivel ? 'var(--bg-input)' : 'var(--primary)';
+
+        elLista.innerHTML += `
+            <div class="item-card" style="border-color: ${isVisivel ? 'var(--primary)' : 'var(--border)'};">
+                <div class="vitrine-img-container">
+                    ${imagemHtml}
+                    <span class="status-badge ${badgeClass}">${badgeTexto}</span>
+                </div>
+                
+                <div class="item-title" style="margin-bottom: 0.4rem;">
+                    <span>${r.nome}</span>
+                </div>
+                
+                <div class="item-details" style="margin-bottom: 1rem;">
+                    <span>Custo Un.: <strong>${fmtDinheiro(r.custoUnitario)}</strong></span>
+                    <span>Varejo (5x): <strong class="text-success">${fmtDinheiro(precoSugeridoVarejo)}</strong></span>
+                    <span style="font-size: 0.8rem; color: var(--shopee);">Shopee: ${fmtDinheiro(precoSugeridoShopee)}</span>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-top: auto;">
+                    <button type="button" 
+                            style="background: ${btnCor}; width: 100%; font-size: 0.9rem;" 
+                            onclick="toggleVisibilidadeVitrine(${r.id})">
+                        ${btnTexto}
+                    </button>
+                    
+                    <button type="button" 
+                            class="btn-small" 
+                            style="background: var(--bg-input); border: 1px solid var(--border); width: 100%; color: var(--text);" 
+                            onclick="acionarUploadVitrine(${r.id})">
+                        🖼️ ${r.fotoUrl ? 'Trocar Foto' : 'Adicionar Foto'}
+                    </button>
+                </div>
+            </div>
+        `;
+    });
+
+    if (elContador) elContador.textContent = `${contadorVisiveis} visíveis na vitrine`;
+}
+
+// 1. Alterna se aparece ou não (Toggle)
+async function toggleVisibilidadeVitrine(id) {
+    const receita = DB.receitas.find(r => r.id === id);
+    if (!receita) return;
+
+    receita.exibirVitrine = !receita.exibirVitrine;
+    receita.lastModified = Date.now();
+
+    await salvarDB();
+    renderizarVitrine();
+}
+
+// 2. Aciona o input de imagem oculto
+function acionarUploadVitrine(id) {
+    idReceitaParaUpload = id;
+    const input = document.getElementById('vitrine-input-upload');
+    if (input) {
+        input.value = ""; // Limpa para permitir subir a mesma imagem se quiser
+        input.click();
+    }
+}
+
+// 3. Ouve o upload no input oculto da vitrine
+const inputVitrineUpload = document.getElementById('vitrine-input-upload');
+if (inputVitrineUpload) {
+    inputVitrineUpload.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file || !idReceitaParaUpload) return;
+
+        const receita = DB.receitas.find(r => r.id === idReceitaParaUpload);
+        if (!receita) return;
+
+        // Feedback visual na tela
+        alert(`⏳ Enviando foto para "${receita.nome}" no ImgBB... Aguarde.`);
+
+        const url = await uploadParaImgBB(file);
+
+        if (url) {
+            receita.fotoUrl = url;
+            receita.exibirVitrine = true; // Já ativa na vitrine por padrão ao subir foto!
+            receita.lastModified = Date.now();
+
+            await salvarDB();
+            renderizarVitrine();
+            alert("✅ Foto atualizada com sucesso!");
+        } else {
+            alert("❌ Falha ao enviar foto.");
+        }
+
+        idReceitaParaUpload = null;
+    });
+}
 
 document.addEventListener('DOMContentLoaded', iniciarApp);
