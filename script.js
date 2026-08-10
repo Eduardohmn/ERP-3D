@@ -331,7 +331,8 @@ async function editarFil(id) {
         fil.lastModified = Date.now();
         if (fil.pesoRestante > fil.pesoInicial) {
             fil.pesoInicial = fil.pesoRestante;
-            fil.custoPorGrama = fil.precoTotal / fil.pesoInicial;
+            alert("⚠️ O peso superou o original. O custo por grama foi mantido para não gerar falsos lucros nas simulações.");
+            // Removemos a linha que alterava o custoPorGrama
         }
         await salvarDB(); 
         renderizarInventario(); 
@@ -827,21 +828,34 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
         let custoMateriais = 0; 
         let filamentosUsados = []; 
         let detalhesNomes = [];
+        let agrupamentoFilamentos = {};
         for (let i = 1; i <= 4; i++) {
             const idSel = parseInt(document.getElementById(`desc-filamento-${i}`).value);
             const peso = parseFloat(document.getElementById(`desc-peso-${i}`).value) || 0;
+            
             if (idSel && peso > 0) {
-                const fil = DB.filamentos.find(f => f.id === idSel);
-                if (!fil || peso > fil.pesoRestante) { 
-                    alert(`Estoque insuficiente de ${fil ? fil.nome : 'filamento'}.`); 
-                    return; 
-                }
-                custoMateriais += (peso * fil.custoPorGrama); 
-                pesoTotalGasto += peso;
-                detalhesNomes.push(`${peso}g de ${fil.nome}`); 
-                filamentosUsados.push({ fil, peso });
+                agrupamentoFilamentos[idSel] = (agrupamentoFilamentos[idSel] || 0) + peso;
             }
         }
+
+        for (const [idStr, pesoTotalReq] of Object.entries(agrupamentoFilamentos)) {
+            const fil = DB.filamentos.find(f => f.id === parseInt(idStr));
+            if (!fil || pesoTotalReq > fil.pesoRestante) { 
+                alert(`Estoque insuficiente! Você tentou gastar ${pesoTotalReq}g de ${fil ? fil.nome : 'desconhecido'}.`); 
+                return; 
+            }
+        }
+
+        for (const [idStr, peso] of Object.entries(agrupamentoFilamentos)) {
+            const fil = DB.filamentos.find(f => f.id === parseInt(idStr));
+            if (!fil) continue;
+
+            custoMateriais += (peso * fil.custoPorGrama);
+            pesoTotalGasto += peso;
+            detalhesNomes.push(`${peso}g de ${fil.nome}`);
+            filamentosUsados.push({ fil, peso });
+        }
+
         if (filamentosUsados.length === 0) { 
             alert("Selecione pelo menos um filamento."); 
             return; 
@@ -882,14 +896,31 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
 
 // 1. O Novo Motor Dinâmico de Taxas
 const MOTOR_TAXAS = {
-    // Vendas Online
-    Shopee: { perc: 0.20, fixo: 4.00 }, // 20% + R$ 4
-    Site: { perc: 0.05, fixo: 0.30 },   // Exemplo: Mercado Pago/Stripe
-    // Vendas Físicas
-    Pix: { perc: 0.00, fixo: 0.00 },
-    Dinheiro: { perc: 0.00, fixo: 0.00 },
-    Credito: { perc: 0.049, fixo: 0.00 }, // Exemplo: 4.9% da maquininha
-    Debito: { perc: 0.019, fixo: 0.00 }   // Exemplo: 1.9% da maquininha
+    Shopee: {
+        calcular: (precoVenda, isCnpj = true) => {
+            let perc = 0.20;
+            let fixo = 4.00;
+
+            if (precoVenda >= 80 && precoVenda < 100) {
+                fixo = 16.00;
+            } else if (precoVenda >= 100) {
+                perc = 0.14;
+                fixo = 26.00;
+            }
+
+            if (!isCnpj) {
+                fixo += 3.00;
+            }
+
+            return (precoVenda * perc) + fixo;
+        },
+        cobrancaFixa: 'por_item'
+    },
+    Site: { perc: 0.05, fixo: 0.30, cobrancaFixa: 'por_transacao' },
+    Pix: { perc: 0.00, fixo: 0.00, cobrancaFixa: 'por_transacao' },
+    Dinheiro: { perc: 0.00, fixo: 0.00, cobrancaFixa: 'por_transacao' },
+    Credito: { perc: 0.049, fixo: 0.00, cobrancaFixa: 'por_transacao' },
+    Debito: { perc: 0.019, fixo: 0.00, cobrancaFixa: 'por_transacao' }
 };
 
 // 2. Lógica de Alternância das Abas (Toggle)
@@ -950,9 +981,21 @@ function renderizarAbaVendas() {
 }
 
 // 4. Funções Universais de Previsão
-function calcularTaxa(valorTotal, regraMotor) {
+function calcularTaxaVenda(precoUni, qtd, regraMotor, isCnpj = true) {
     if (!regraMotor) return 0;
-    return (valorTotal * regraMotor.perc) + regraMotor.fixo;
+
+    const precoTotal = precoUni * qtd;
+
+    if (typeof regraMotor.calcular === 'function') {
+        if (regraMotor.cobrancaFixa === 'por_item') {
+            return regraMotor.calcular(precoUni, isCnpj) * qtd;
+        }
+        return regraMotor.calcular(precoTotal, isCnpj);
+    }
+
+    const taxaPercentual = precoTotal * regraMotor.perc;
+    const taxaFixa = regraMotor.cobrancaFixa === 'por_item' ? (regraMotor.fixo * qtd) : regraMotor.fixo;
+    return taxaPercentual + taxaFixa;
 }
 
 const calcularPrevVendaPDV = () => {
@@ -974,8 +1017,8 @@ const calcularPrevVendaPDV = () => {
 
     const custoTotalFab = produto.custoUnitario * qtd;
     const receitaBruta = precoUni * qtd;
-    // Puxa do motor de taxas dinâmico
-    const taxaTotal = calcularTaxa(receitaBruta, MOTOR_TAXAS[metodo]);
+    const regra = MOTOR_TAXAS[metodo];
+    const taxaTotal = calcularTaxaVenda(precoUni, qtd, regra);
     const lucroLiquido = receitaBruta - custoTotalFab - taxaTotal;
 
     elCusto.textContent = fmtDinheiro(custoTotalFab); 
@@ -1003,12 +1046,8 @@ const calcularPrevVendaOnline = () => {
 
     const custoTotalFab = produto.custoUnitario * qtd;
     const receitaBruta = precoUni * qtd;
-    
-    // A Shopee cobra (20% do item) + R$4 Fixo. Multiplicamos a taxa total pelo número de itens se a plataforma calcular por item.
-    // O Motor avalia a venda total. Para precisão Shopee:
-    const taxaPorItem = calcularTaxa(precoUni, MOTOR_TAXAS[plataforma]);
-    const taxaTotal = taxaPorItem * qtd; 
-    
+    const regra = MOTOR_TAXAS[plataforma];
+    const taxaTotal = calcularTaxaVenda(precoUni, qtd, regra);
     const lucroLiquido = receitaBruta - custoTotalFab - taxaTotal;
 
     elCusto.textContent = fmtDinheiro(custoTotalFab); 
@@ -1034,15 +1073,8 @@ async function processarVenda(tipoVenda, formValues) {
 
     const custoTotalFab = produto.custoUnitario * qtd; 
     const receitaBruta = precoUni * qtd;
-    
-    let taxaTotal = 0;
-    if (tipoVenda === 'Fisica') {
-        taxaTotal = calcularTaxa(receitaBruta, MOTOR_TAXAS[canalOrMetodo]);
-    } else {
-        const taxaPorItem = calcularTaxa(precoUni, MOTOR_TAXAS[canalOrMetodo]);
-        taxaTotal = taxaPorItem * qtd;
-    }
-    
+    const regra = MOTOR_TAXAS[canalOrMetodo];
+    const taxaTotal = calcularTaxaVenda(precoUni, qtd, regra);
     const lucroLiquido = receitaBruta - custoTotalFab - taxaTotal;
     
     produto.quantidade -= qtd; 
