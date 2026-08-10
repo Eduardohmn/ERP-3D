@@ -364,46 +364,88 @@
         <!-- ABA 5: VENDAS -->
         <div id="tab-vendas" class="tab-content">
             <h1>Estoque Pronto & Vendas</h1>
+            
             <div class="card card-alt">
                 <h3>📦 Produtos Disponíveis</h3>
                 <div id="lista-estoque-prontos" class="grid-list"></div>
             </div>
-            <div class="card" style="border-color: var(--primary);">
-                <h2>💰 Registrar Nova Venda</h2>
-                <form id="form-venda">
+
+            <!-- Botões de Controle de Fluxo -->
+            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
+                <button type="button" id="btn-modo-pdv" class="btn-primary" style="flex: 1; border: 2px solid var(--primary);">🛒 Venda Física (PDV)</button>
+                <button type="button" id="btn-modo-online" style="flex: 1; background: var(--bg-input); color: var(--text); border: 1px solid var(--border);">🌐 Venda Online</button>
+            </div>
+
+            <!-- FORMULÁRIO 1: VENDA FÍSICA (PDV) -->
+            <div class="card" id="painel-venda-pdv" style="border-color: var(--primary);">
+                <h2 style="color: var(--primary);">🛒 Venda Balcão / Feira</h2>
+                <form id="form-venda-pdv">
                     <div class="form-row">
-                        <div class="form-col" style="flex: 2;"><label>Produto Vendido:</label><select id="venda-produto"
-                                required>
-                                <option value="">Selecione no estoque...</option>
-                            </select></div>
-                        <div class="form-col"><label>Qtd Vendida:</label><input type="number" id="venda-qtd" min="1"
-                                step="1" value="1" required></div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-col"><label>Canal:</label><select id="venda-canal" required>
-                                <option value="Varejo">Varejo</option>
-                                <option value="Atacado">Atacado</option>
-                                <option value="Shopee">Shopee</option>
-                            </select></div>
-                        <div class="form-col"><label>Preço de Venda Un. (R$):</label><input type="number"
-                                id="venda-preco" step="0.01" required>
-                            <div id="sugestao-preco-container"
-                                style="font-size: 0.85rem; margin-top: 0.4rem; display: none;">💡 Sugerido: <span
-                                    id="sugestao-preco-valor"
-                                    style="color: var(--success); font-weight: bold; cursor: pointer; text-decoration: underline;">R$
-                                    0,00</span></div>
+                        <div class="form-col" style="flex: 2;"><label>Produto:</label>
+                            <select class="venda-produto-select" id="venda-pdv-produto" required></select>
+                        </div>
+                        <div class="form-col"><label>Qtd:</label>
+                            <input type="number" id="venda-pdv-qtd" min="1" step="1" value="1" required>
                         </div>
                     </div>
-                    <div id="prev-venda"
-                        style="background: var(--bg-input); padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border: 1px dashed var(--border);">
-                        <div class="res-row"><span>Custo Fab. Total:</span> <strong id="prev-custo">R$ 0,00</strong>
+                    <div class="form-row">
+                        <div class="form-col"><label>Método de Pagamento:</label>
+                            <select id="venda-pdv-metodo" required>
+                                <option value="Pix">Pix (Sem taxa)</option>
+                                <option value="Dinheiro">Dinheiro (Sem taxa)</option>
+                                <option value="Credito">Cartão de Crédito</option>
+                                <option value="Debito">Cartão de Débito</option>
+                            </select>
                         </div>
-                        <div class="res-row"><span>Taxas:</span> <strong id="prev-taxa" class="text-danger">R$
-                                0,00</strong></div>
-                        <div class="res-row destaque"><span>LUCRO LÍQUIDO:</span> <strong id="prev-lucro">R$
-                                0,00</strong></div>
+                        <div class="form-col"><label>Preço Final Un. (R$):</label>
+                            <input type="number" id="venda-pdv-preco" step="0.01" required>
+                        </div>
                     </div>
-                    <button type="submit" style="width: 100%;">💲 Confirmar Venda</button>
+                    <!-- Preview PDV -->
+                    <div class="prev-venda-box" style="background: var(--bg-input); padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border: 1px dashed var(--border);">
+                        <div class="res-row"><span>Custo Peças:</span> <strong id="prev-pdv-custo">R$ 0,00</strong></div>
+                        <div class="res-row"><span>Taxa Maquininha:</span> <strong id="prev-pdv-taxa" class="text-danger">R$ 0,00</strong></div>
+                        <div class="res-row destaque"><span>LUCRO LÍQUIDO:</span> <strong id="prev-pdv-lucro">R$ 0,00</strong></div>
+                    </div>
+                    <button type="submit" style="width: 100%;">💲 Confirmar Venda Física</button>
+                </form>
+            </div>
+
+            <!-- FORMULÁRIO 2: VENDA ONLINE -->
+            <div class="card" id="painel-venda-online" style="display: none; border-color: var(--shopee);">
+                <h2 style="color: var(--shopee);">🌐 Venda E-commerce</h2>
+                <form id="form-venda-online">
+                    <div class="form-row">
+                        <div class="form-col" style="flex: 2;"><label>Produto:</label>
+                            <select class="venda-produto-select" id="venda-on-produto" required></select>
+                        </div>
+                        <div class="form-col"><label>Qtd:</label>
+                            <input type="number" id="venda-on-qtd" min="1" step="1" value="1" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-col"><label>Plataforma:</label>
+                            <select id="venda-on-plataforma" required>
+                                <option value="Shopee">Shopee Padrão</option>
+                                <option value="Site">Site SixWolves</option>
+                            </select>
+                        </div>
+                        <div class="form-col"><label>Preço de Venda Un. (R$):</label>
+                            <input type="number" id="venda-on-preco" step="0.01" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-col"><label>Código de Rastreio (Opcional por enquanto):</label>
+                            <input type="text" id="venda-on-rastreio" placeholder="BR123456789BR">
+                        </div>
+                    </div>
+                    <!-- Preview Online -->
+                    <div class="prev-venda-box" style="background: var(--bg-input); padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border: 1px dashed var(--border);">
+                        <div class="res-row"><span>Custo Fab.+Emb.:</span> <strong id="prev-on-custo">R$ 0,00</strong></div>
+                        <div class="res-row"><span>Comissão + Fixo:</span> <strong id="prev-on-taxa" class="text-danger">R$ 0,00</strong></div>
+                        <div class="res-row destaque"><span>LUCRO LÍQUIDO:</span> <strong id="prev-on-lucro">R$ 0,00</strong></div>
+                    </div>
+                    <button type="submit" style="width: 100%; background: var(--shopee);">📦 Confirmar Venda Online</button>
                 </form>
             </div>
         </div>
