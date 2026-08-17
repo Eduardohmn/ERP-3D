@@ -19,7 +19,7 @@ let GIST_ID = localStorage.getItem('gist_id');
 // =======================================================================
 // 🔄 SISTEMA DE VERIFICAÇÃO DE VERSÃO (ANTI-CACHE E CONFLITOS)
 // =======================================================================
-const VERSAO_ATUAL = "1.0.6"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
+const VERSAO_ATUAL = "1.0.7"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
 const INTERVALO_VERIFICACAO = 3 * 60 * 1000; // 3 minutos (em milissegundos)
 
 async function verificarAtualizacao() {
