@@ -153,14 +153,18 @@
                                 0,00</strong></span></div>
 
                     <div style="background: var(--bg-input); padding: 1rem; border-radius: 6px; margin-top: 1rem;">
-                        <label style="color: var(--shopee); font-weight: bold;">Simulador Dinâmico (Shopee R$):</label>
-                        <input type="number" id="sim-shopee-preco" step="0.01"
-                            style="margin-top: 0.5rem; margin-bottom: 1rem;">
-                        <div class="res-row"><span>Taxa Retida:</span><span id="sim-shopee-taxa">R$ 0,00</span></div>
-                        <div class="res-row"><span>Valor Líquido:</span><span id="sim-shopee-liquido">R$ 0,00</span>
+                        <div class="flex-between">
+                            <label style="color: var(--shopee); font-weight: bold;">Simulador Shopee 2026:</label>
+                            <label style="font-size: 0.85rem; display: flex; align-items: center; gap: 5px; color: var(--warning);">
+                                <input type="checkbox" id="sim-shopee-cpf" checked> Conta CPF (+R$ 3)
+                            </label>
                         </div>
-                        <div class="res-row destaque" style="border-top: none; padding-top: 0;"><span>SEU LUCRO
-                                REAL:</span><strong id="sim-shopee-lucro">R$ 0,00</strong></div>
+                        <input type="number" id="sim-shopee-preco" step="0.01" style="margin-top: 0.5rem; margin-bottom: 1rem;">
+                        
+                        <div class="res-row"><span>Taxa Retida:</span><span id="sim-shopee-taxa">R$ 0,00</span></div>
+                        <div class="res-row"><span>Valor Líquido:</span><span id="sim-shopee-liquido">R$ 0,00</span></div>
+                        <div class="res-row destaque" style="border-top: none; padding-top: 0;"><span>SEU LUCRO REAL:</span><strong id="sim-shopee-lucro">R$ 0,00</strong></div>
+                        
                         <div id="alerta-shopee" style="display: none;" class="alert-box"></div>
                     </div>
 
@@ -480,6 +484,17 @@
                     <button id="btn-pagar-energia"
                         style="margin-top: 0.5rem; background: #ffeb3b; color: #000; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; padding: 0.3rem;">💸
                         Pagar Luz</button>
+                </div>
+            </div>
+            <!-- NOVO: Detalhamento de Gastos Mensais -->
+            <div class="card" style="border-color: var(--primary); margin-bottom: 2rem;">
+                <div class="flex-between">
+                    <h3 style="color: var(--primary); margin: 0;">📊 Detalhamento de Custos e Taxas</h3>
+                    <input type="month" id="filtro-mes-hist" style="padding: 0.3rem; background: var(--bg-input); color: #fff; border: 1px solid var(--border); border-radius: 4px;">
+                </div>
+                
+                <div id="painel-detalhamento-mes" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
+                    <!-- Preenchido via JavaScript -->
                 </div>
             </div>
             <div class="card card-alt" style="margin-bottom: 2rem;">

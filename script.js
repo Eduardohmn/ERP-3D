@@ -524,34 +524,49 @@ function atualizarSimulacaoShopee(precoVenda, custo) {
     const elLiq = document.getElementById('sim-shopee-liquido'); 
     const elLuc = document.getElementById('sim-shopee-lucro'); 
     const alertBox = document.getElementById('alerta-shopee');
+    
     if (isNaN(precoVenda) || precoVenda <= 0) { 
-        elTaxa.textContent = 'R$ 0,00'; 
-        elLiq.textContent = 'R$ 0,00'; 
-        elLuc.textContent = 'R$ 0,00'; 
-        alertBox.style.display = 'none'; 
-        return; 
+        elTaxa.textContent = 'R$ 0,00'; elLiq.textContent = 'R$ 0,00'; elLuc.textContent = 'R$ 0,00'; alertBox.style.display = 'none'; return; 
     }
-    const taxa = 4 + (precoVenda * 0.20); 
+    
+    // Puxa se a loja ainda é CPF
+    const isCpf = document.getElementById('sim-shopee-cpf').checked;
+    
+    // Executa o cálculo exato de 2026
+    const taxa = calcularTaxa(precoVenda, 1, MOTOR_TAXAS['Shopee'], isCpf); 
     const liquido = precoVenda - taxa; 
     const lucro = liquido - custo;
+    
     elTaxa.textContent = fmtDinheiro(taxa); 
     elLiq.textContent = fmtDinheiro(liquido); 
     elLuc.textContent = fmtDinheiro(lucro); 
     elLuc.className = lucro >= 0 ? 'text-success' : 'text-danger';
-    if (lucro < 0) { 
+    
+    // Alertas Inteligentes
+    if (precoVenda >= 80 && precoVenda < 100) {
         alertBox.className = 'alert-box alert-danger'; 
-        alertBox.innerHTML = '🚨 PREJUÍZO! Venda não cobre taxas e custo.'; 
+        alertBox.innerHTML = '🚨 ZONA DE PERIGO (R$ 80 a R$ 99)!<br>A taxa fixa saltou drasticamente. Vender a R$ 79,90 pode dar mais lucro.'; 
         alertBox.style.display = 'block'; 
-    }
-    else if (lucro < 1) { 
+    } else if (lucro < 0) { 
+        alertBox.className = 'alert-box alert-danger'; 
+        alertBox.innerHTML = '🚨 PREJUÍZO! Venda não cobre as novas taxas.'; 
+        alertBox.style.display = 'block'; 
+    } else if (lucro < 1) { 
         alertBox.className = 'alert-box alert-warning'; 
-        alertBox.innerHTML = '⚠️ SEM LUCRO! Preço de custo.'; 
+        alertBox.innerHTML = '⚠️ SEM LUCRO! Trabalhando de graça.'; 
         alertBox.style.display = 'block'; 
-    }
-    else { 
+    } else { 
         alertBox.style.display = 'none'; 
     }
 }
+
+// Escuta a mudança no checkbox do CPF para recalcular ao vivo
+document.getElementById('sim-shopee-cpf').addEventListener('change', () => { 
+    if (simulacaoAtual) {
+        const precoAtual = parseFloat(document.getElementById('sim-shopee-preco').value) || 0;
+        atualizarSimulacaoShopee(precoAtual, simulacaoAtual.custoUnitario); 
+    }
+});
 
 document.getElementById('btn-salvar-receita').addEventListener('click', async () => {
     if (!simulacaoAtual) return;
@@ -894,34 +909,53 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
 
 // --- VENDAS, MOTOR DE TAXAS E DASHBOARD ---
 
-// 1. O Novo Motor Dinâmico de Taxas
+// 1. O Novo Motor Dinâmico de Taxas (Regras 2026)
 const MOTOR_TAXAS = {
     Shopee: {
-        calcular: (precoVenda, isCnpj = true) => {
-            let perc = 0.20;
-            let fixo = 4.00;
+        // Função avançada para processar a tabela da Shopee
+        calcular: (precoVenda, qtd, isCpf = true) => {
+            let perc = 0.20; 
+            let fixo = 4.00; // Até R$ 79,99
 
+            // A Armadilha das Faixas de Preço
             if (precoVenda >= 80 && precoVenda < 100) {
-                fixo = 16.00;
+                perc = 0.20;
+                fixo = 16.00; // Zona de Perigo Crítica
             } else if (precoVenda >= 100) {
                 perc = 0.14;
                 fixo = 26.00;
             }
 
-            if (!isCnpj) {
+            // Sobretaxa Punitiva para CPF (+ R$ 3,00)
+            if (isCpf) {
                 fixo += 3.00;
             }
 
-            return (precoVenda * perc) + fixo;
-        },
-        cobrancaFixa: 'por_item'
+            // O fixo da Shopee é cobrado POR ITEM
+            return ((precoVenda * perc) + fixo) * qtd; 
+        }
     },
     Site: { perc: 0.05, fixo: 0.30, cobrancaFixa: 'por_transacao' },
     Pix: { perc: 0.00, fixo: 0.00, cobrancaFixa: 'por_transacao' },
-    Dinheiro: { perc: 0.00, fixo: 0.00, cobrancaFixa: 'por_transacao' },
     Credito: { perc: 0.049, fixo: 0.00, cobrancaFixa: 'por_transacao' },
     Debito: { perc: 0.019, fixo: 0.00, cobrancaFixa: 'por_transacao' }
 };
+
+function calcularTaxa(precoUni, qtd, regraMotor, isCpf = false) {
+    if (!regraMotor) return 0;
+    
+    // Se a plataforma tiver uma função complexa própria (Como a Shopee 2026)
+    if (regraMotor.calcular) {
+        return regraMotor.calcular(precoUni, qtd, isCpf);
+    }
+
+    // Regra matemática comum para Site e Maquininhas
+    const receitaBruta = precoUni * qtd;
+    const taxaPercentual = receitaBruta * regraMotor.perc;
+    const taxaFixa = regraMotor.cobrancaFixa === 'por_item' ? (regraMotor.fixo * qtd) : regraMotor.fixo;
+    
+    return taxaPercentual + taxaFixa;
+}
 
 // 2. Lógica de Alternância das Abas (Toggle)
 let modoVendaAtual = 'PDV'; 
@@ -984,15 +1018,12 @@ function renderizarAbaVendas() {
 function calcularTaxaVenda(precoUni, qtd, regraMotor, isCnpj = true) {
     if (!regraMotor) return 0;
 
-    const precoTotal = precoUni * qtd;
-
     if (typeof regraMotor.calcular === 'function') {
-        if (regraMotor.cobrancaFixa === 'por_item') {
-            return regraMotor.calcular(precoUni, isCnpj) * qtd;
-        }
-        return regraMotor.calcular(precoTotal, isCnpj);
+        const isCpf = !isCnpj;
+        return calcularTaxa(precoUni, qtd, regraMotor, isCpf);
     }
 
+    const precoTotal = precoUni * qtd;
     const taxaPercentual = precoTotal * regraMotor.perc;
     const taxaFixa = regraMotor.cobrancaFixa === 'por_item' ? (regraMotor.fixo * qtd) : regraMotor.fixo;
     return taxaPercentual + taxaFixa;
@@ -1185,6 +1216,91 @@ function renderizarHistoricos() {
         elPerdas.innerHTML += `<div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--warning);"><div class="flex-between"><strong>${p.tipo}: ${p.pesoGasto} em ${p.filamentoNome}</strong><span class="badge">${p.data}</span></div><div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.3rem;">Motivo: ${p.motivo}</div><div class="res-row destaque" style="border:none; padding:0;"><span style="color:var(--text-muted);">Prejuízo Total:</span><strong class="text-danger">-${fmtDinheiro(p.custoTotal)}</strong></div></div>`; 
     });
 }
+
+function configurarFiltroMes() {
+    const elFiltro = document.getElementById('filtro-mes-hist');
+    if (!elFiltro) return;
+    
+    // Define o mês atual como padrão (Ex: "2026-08")
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    elFiltro.value = `${ano}-${mes}`;
+    
+    elFiltro.addEventListener('change', renderizarDetalhamentoMes);
+}
+
+function renderizarDetalhamentoMes() {
+    const inputMes = document.getElementById('filtro-mes-hist').value;
+    if(!inputMes) return;
+    
+    const [anoFiltro, mesFiltro] = inputMes.split('-');
+    
+    let totalBruto = 0;
+    let taxasPlataforma = 0;
+    let comprasMaterial = 0;
+    let gastosEnergia = 0;
+    let perdasDescarte = 0;
+    let gastosLogistica = 0;
+
+    // Filtra Vendas do Mês Selecionado
+    DB.historicoVendas.forEach(v => {
+        const [diaV, mesV, anoV] = v.data.split('/');
+        if (mesV === mesFiltro && anoV === anoFiltro) {
+            totalBruto += (v.precoVendaTotal || 0);
+            taxasPlataforma += (v.taxa || 0);
+        }
+    });
+
+    // Filtra Gastos Gerais do Mês Selecionado
+    DB.historicoGastos.forEach(g => {
+        const [diaG, mesG, anoG] = g.data.split('/');
+        if (mesG === mesFiltro && anoG === anoFiltro) {
+            const desc = g.descricao.toLowerCase();
+            if (desc.includes("compra")) comprasMaterial += g.valor;
+            else if (desc.includes("energia")) gastosEnergia += g.valor;
+            else if (desc.includes("perda")) perdasDescarte += g.valor;
+            else if (desc.includes("embalagem") || desc.includes("frete")) gastosLogistica += g.valor;
+            else comprasMaterial += g.valor; // Outros
+        }
+    });
+
+    const lucroOperacional = totalBruto - (taxasPlataforma + comprasMaterial + gastosEnergia + gastosLogistica + perdasDescarte);
+
+    const painel = document.getElementById('painel-detalhamento-mes');
+    painel.innerHTML = `
+        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--border);">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Total de Vendas (Bruto)</div>
+            <strong style="font-size: 1.2rem; color: #fff;">${fmtDinheiro(totalBruto)}</strong>
+        </div>
+        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--danger);">
+            <div style="font-size: 0.8rem; color: var(--danger);">Taxas (Shopee/Cartão)</div>
+            <strong style="font-size: 1.2rem; color: var(--danger);">-${fmtDinheiro(taxasPlataforma)}</strong>
+        </div>
+        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--warning);">
+            <div style="font-size: 0.8rem; color: var(--warning);">Compras de Insumos/Material</div>
+            <strong style="font-size: 1.2rem; color: var(--warning);">-${fmtDinheiro(comprasMaterial)}</strong>
+        </div>
+        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--border);">
+            <div style="font-size: 0.8rem; color: #ffeb3b;">Energia Elétrica (Paga)</div>
+            <strong style="font-size: 1.2rem; color: #ffeb3b;">-${fmtDinheiro(gastosEnergia)}</strong>
+        </div>
+        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px dashed var(--danger);">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Desperdício (Peças Falhas)</div>
+            <strong style="font-size: 1.2rem; color: var(--danger);">-${fmtDinheiro(perdasDescarte)}</strong>
+        </div>
+        <div style="background: var(--primary); padding: 1rem; border-radius: 4px; grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-size: 0.9rem; color: #fff; font-weight: bold;">Lucro Operacional do Mês:</div>
+            <strong style="font-size: 1.4rem; color: #fff;">${fmtDinheiro(lucroOperacional)}</strong>
+        </div>
+    `;
+}
+
+// Chame estas funções no final do seu `renderizarHistoricos()` ou no `iniciarApp()`:
+document.addEventListener('DOMContentLoaded', () => {
+    configurarFiltroMes();
+    setTimeout(renderizarDetalhamentoMes, 1000); // Aguarda carregar dados do GitHub
+});
 
 document.getElementById('btn-pagar-energia').addEventListener('click', async () => {
     if (!DB.energiaAcumulada || DB.energiaAcumulada <= 0) { 
