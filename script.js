@@ -19,7 +19,7 @@ let GIST_ID = localStorage.getItem('gist_id');
 // =======================================================================
 // 🔄 SISTEMA DE VERIFICAÇÃO DE VERSÃO (ANTI-CACHE E CONFLITOS)
 // =======================================================================
-const VERSAO_ATUAL = "1.0.7"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
+const VERSAO_ATUAL = "1.0.8"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
 const INTERVALO_VERIFICACAO = 3 * 60 * 1000; // 3 minutos (em milissegundos)
 
 async function verificarAtualizacao() {
@@ -90,7 +90,7 @@ function mesclarBancosDeDados(dbNuvem, dbLocal) {
         'filamentos', 'extras', 'receitas', 'estoqueProntos',
         'historicoProducao', 'historicoVendas', 'historicoPerdas', 'historicoGastos'
     ];
-    let bancoAtualizado = { energiaAcumulada: dbLocal.energiaAcumulada || dbNuvem.energiaAcumulada || 0 };
+    let bancoAtualizado = { energiaAcumulada: dbLocal.energiaAcumulada ?? dbNuvem.energiaAcumulada ?? 0 };
 
     categorias.forEach(categoria => {
         let itensNuvem = dbNuvem[categoria] || [];
