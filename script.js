@@ -7,7 +7,7 @@ let syncTimeLocal = Date.now();
 let DB = {
     filamentos: [], extras: [], receitas: [],
     estoqueProntos: [], historicoProducao: [], historicoVendas: [], historicoPerdas: [],
-    historicoGastos: [], energiaAcumulada: 0
+    historicoGastos: [], energiaAcumulada: { valor: 0, lastModified: 0 }
 };
 let simulacaoAtual = null; 
 let editandoReceitaId = null;
@@ -21,21 +21,26 @@ let GIST_ID = localStorage.getItem('gist_id');
 // =======================================================================
 const VERSAO_ATUAL = "1.0.8"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
 const INTERVALO_VERIFICACAO = 3 * 60 * 1000; // 3 minutos (em milissegundos)
+let ultimaAtualizacaoGist = null;
 
 async function verificarAtualizacao() {
+    if (!GITHUB_TOKEN || !GIST_ID) return;
     try {
-        const resposta = await fetch(`versao.json?t=${Date.now()}`);
+        const resposta = await fetch(`https://api.github.com/gists/${GIST_ID}`, { 
+            headers: { 'Authorization': `token ${GITHUB_TOKEN}` } 
+        });
         if (!resposta.ok) return;
 
         const dadosNuvem = await resposta.json();
+        const dataAtualizacao = dadosNuvem.updated_at;
 
-        if (dadosNuvem.versao !== VERSAO_ATUAL) {
-            const alerta = "⚠️ ATUALIZAÇÃO IMPORTANTE!\n\nUma nova versão do sistema foi detectada (ou alguém salvou dados novos). \n\nPara evitar que você apague o trabalho da equipe, a página precisa ser atualizada. Clique em OK para recarregar.";
-            alert(alerta);
+        if (ultimaAtualizacaoGist && dataAtualizacao !== ultimaAtualizacaoGist) {
+            alert("⚠️ DADOS ATUALIZADOS NA NUVEM!\n\nAlguém da equipe salvou dados novos. A página será recarregada para evitar conflitos de sobrescrita.");
             window.location.reload(true);
         }
+        ultimaAtualizacaoGist = dataAtualizacao;
     } catch (erro) {
-        console.log("Falha ao checar versão (Você pode estar sem internet).", erro);
+        console.log("Falha ao checar atualizações da nuvem.", erro);
     }
 }
 
@@ -76,11 +81,12 @@ async function iniciarNuvem() {
             DB.historicoVendas = cloudDB.historicoVendas || []; 
             DB.historicoPerdas = cloudDB.historicoPerdas || [];
             DB.historicoGastos = cloudDB.historicoGastos || [];
-            DB.energiaAcumulada = cloudDB.energiaAcumulada !== undefined ? cloudDB.energiaAcumulada : (DB.energiaAcumulada || 0);
+            DB.energiaAcumulada = cloudDB.energiaAcumulada !== undefined ? cloudDB.energiaAcumulada : DB.energiaAcumulada;
             syncTimeLocal = Date.now();
         }
     } catch (error) { 
         console.error("Erro nuvem:", error); 
+        alert("☁️ Falha ao carregar os dados da nuvem. O sistema operará com a versão local.");
     }
 }
 
@@ -90,7 +96,18 @@ function mesclarBancosDeDados(dbNuvem, dbLocal) {
         'filamentos', 'extras', 'receitas', 'estoqueProntos',
         'historicoProducao', 'historicoVendas', 'historicoPerdas', 'historicoGastos'
     ];
-    let bancoAtualizado = { energiaAcumulada: dbLocal.energiaAcumulada ?? dbNuvem.energiaAcumulada ?? 0 };
+    // Retrocompatibilidade para converter números antigos em objetos
+    let energiaNuvem = typeof dbNuvem.energiaAcumulada === 'number' 
+        ? { valor: dbNuvem.energiaAcumulada, lastModified: 0 } 
+        : (dbNuvem.energiaAcumulada || { valor: 0, lastModified: 0 });
+        
+    let energiaLocal = typeof dbLocal.energiaAcumulada === 'number' 
+        ? { valor: dbLocal.energiaAcumulada, lastModified: 0 } 
+        : (dbLocal.energiaAcumulada || { valor: 0, lastModified: 0 });
+
+    let bancoAtualizado = { 
+        energiaAcumulada: (energiaLocal.lastModified > energiaNuvem.lastModified) ? energiaLocal : energiaNuvem
+    };
 
     categorias.forEach(categoria => {
         let itensNuvem = dbNuvem[categoria] || [];
@@ -143,6 +160,8 @@ async function salvarDB() {
         });
 
         if (!respostaPatch.ok) throw new Error('Erro ao salvar no GitHub.');
+        const dadosGistAtualizado = await respostaPatch.json();
+        ultimaAtualizacaoGist = dadosGistAtualizado.updated_at || dadosGist.updated_at;
 
         atualizarSelectsDinamicos(); 
         atualizarSelectProducao(); 
@@ -153,6 +172,7 @@ async function salvarDB() {
         renderizarVitrine();
     } catch (e) { 
         console.error('Falha sync:', e); 
+        alert("❌ Erro ao salvar na nuvem! Verifique sua conexão ou token do GitHub. Seus dados foram salvos apenas localmente.");
     }
 }
 
@@ -731,7 +751,8 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     let energiaFornada = 0;
     if (receita.params) energiaFornada = (receita.params.h + (receita.params.m / 60)) * receita.params.kw * receita.params.precoKwh;
     const energiaTotalProducao = energiaFornada * fatorGastoFilamento;
-    DB.energiaAcumulada = (DB.energiaAcumulada || 0) + energiaTotalProducao;
+    const energiaAtual = DB.energiaAcumulada?.valor !== undefined ? DB.energiaAcumulada.valor : (DB.energiaAcumulada || 0);
+    DB.energiaAcumulada = { valor: energiaAtual + energiaTotalProducao, lastModified: Date.now() };
 
     if (receita.filamentosUsados && Array.isArray(receita.filamentosUsados)) {
         for (let fUsado of receita.filamentosUsados) {
@@ -883,7 +904,8 @@ document.getElementById('form-descarte').addEventListener('submit', async (e) =>
 
         const impressora = document.getElementById('desc-impressora').value;
         const custoEletrico = ((horas + (min / 60)) * kw * kwh);
-        DB.energiaAcumulada = (DB.energiaAcumulada || 0) + custoEletrico;
+        const energiaAtual = DB.energiaAcumulada?.valor !== undefined ? DB.energiaAcumulada.valor : (DB.energiaAcumulada || 0);
+        DB.energiaAcumulada = { valor: energiaAtual + custoEletrico, lastModified: Date.now() };
 
         custoTotalPerda = custoMateriais + custoEletrico;
         // O caixa só perde dinheiro novo com a energia. O material já foi pago na compra.
@@ -1172,7 +1194,7 @@ function renderizarHistoricos() {
 
     document.getElementById('dash-entrou').textContent = fmtDinheiro(totalEntrou); 
     document.getElementById('dash-saiu').textContent = fmtDinheiro(totalSaiu);
-    document.getElementById('dash-energia').textContent = fmtDinheiro(DB.energiaAcumulada || 0);
+    document.getElementById('dash-energia').textContent = fmtDinheiro(DB.energiaAcumulada?.valor ?? DB.energiaAcumulada ?? 0);
     const elLucro = document.getElementById('dash-lucro'); 
     elLucro.textContent = fmtDinheiro(lucroLiquido); 
     elLucro.className = lucroLiquido >= 0 ? 'text-success' : 'text-danger';
@@ -1303,13 +1325,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 document.getElementById('btn-pagar-energia').addEventListener('click', async () => {
-    if (!DB.energiaAcumulada || DB.energiaAcumulada <= 0) { 
+    const energiaAtual = DB.energiaAcumulada?.valor !== undefined ? DB.energiaAcumulada.valor : (DB.energiaAcumulada || 0);
+    if (energiaAtual <= 0) { 
         alert("A conta de luz já está zerada no sistema!"); 
         return; 
     }
-    if (confirm(`Registrar o pagamento de ${fmtDinheiro(DB.energiaAcumulada)} referente à energia?\nIsso enviará o valor para o 'Total Saiu'.`)) {
-        DB.historicoGastos.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `⚡ Pagamento Energia (Impr. 3D)`, valor: DB.energiaAcumulada });
-        DB.energiaAcumulada = 0; 
+    if (confirm(`Registrar o pagamento de ${fmtDinheiro(energiaAtual)} referente à energia?\nIsso enviará o valor para o 'Total Saiu'.`)) {
+        DB.historicoGastos.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `⚡ Pagamento Energia (Impr. 3D)`, valor: energiaAtual });
+        DB.energiaAcumulada = { valor: 0, lastModified: Date.now() }; 
         await salvarDB(); 
         renderizarHistoricos(); 
         alert("Pagamento registrado!");
