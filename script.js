@@ -73,15 +73,7 @@ async function iniciarNuvem() {
         const content = data.files['database.json'].content;
         if (content && content !== "{}") {
             const cloudDB = JSON.parse(content);
-            DB.filamentos = cloudDB.filamentos || []; 
-            DB.extras = cloudDB.extras || []; 
-            DB.receitas = cloudDB.receitas || [];
-            DB.estoqueProntos = cloudDB.estoqueProntos || []; 
-            DB.historicoProducao = cloudDB.historicoProducao || [];
-            DB.historicoVendas = cloudDB.historicoVendas || []; 
-            DB.historicoPerdas = cloudDB.historicoPerdas || [];
-            DB.historicoGastos = cloudDB.historicoGastos || [];
-            DB.energiaAcumulada = cloudDB.energiaAcumulada !== undefined ? cloudDB.energiaAcumulada : DB.energiaAcumulada;
+            DB = mesclarBancosDeDados(cloudDB, DB);
             syncTimeLocal = Date.now();
         }
     } catch (error) { 
@@ -119,11 +111,17 @@ function mesclarBancosDeDados(dbNuvem, dbLocal) {
         itensLocais.forEach(itemLocal => {
             if (mapa.has(itemLocal.id)) {
                 let itemNuvem = mapa.get(itemLocal.id);
-                if (itemLocal.lastModified && itemNuvem.lastModified) {
-                    if (itemLocal.lastModified > itemNuvem.lastModified) {
-                        mapa.set(itemLocal.id, itemLocal);
-                    }
-                } else {
+                if (categoria === 'estoqueProntos' && itemNuvem.quantidade !== undefined) {
+                    itemLocal.quantidade = Math.min(itemLocal.quantidade, itemNuvem.quantidade);
+                }
+                if (categoria === 'filamentos' && itemNuvem.pesoRestante !== undefined) {
+                    itemLocal.pesoRestante = Math.min(itemLocal.pesoRestante, itemNuvem.pesoRestante);
+                }
+                if (categoria === 'extras' && itemNuvem.qtdRestante !== undefined) {
+                    itemLocal.qtdRestante = Math.min(itemLocal.qtdRestante, itemNuvem.qtdRestante);
+                }
+
+                if (itemLocal.lastModified > itemNuvem.lastModified) {
                     mapa.set(itemLocal.id, itemLocal);
                 }
             } else {
@@ -137,18 +135,20 @@ function mesclarBancosDeDados(dbNuvem, dbLocal) {
     return bancoAtualizado;
 }
 
-async function salvarDB() {
+async function salvarDB(forcarSubstituicao = false) {
     if (!GITHUB_TOKEN || !GIST_ID) { 
         localStorage.setItem('db_backup', JSON.stringify(DB)); 
         return; 
     }
     try {
-        const respostaGet = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Authorization': `token ${GITHUB_TOKEN}` } });
-        if (!respostaGet.ok) throw new Error('Falha ao obter Gist remoto.');
-        const dadosGist = await respostaGet.json();
-        const dbNuvem = (dadosGist && dadosGist.files && dadosGist.files['database.json'] && dadosGist.files['database.json'].content) ? JSON.parse(dadosGist.files['database.json'].content) : {};
+        if (!forcarSubstituicao) {
+            const respostaGet = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Authorization': `token ${GITHUB_TOKEN}` } });
+            if (!respostaGet.ok) throw new Error('Falha ao obter Gist remoto.');
+            const dadosGist = await respostaGet.json();
+            const dbNuvem = (dadosGist && dadosGist.files && dadosGist.files['database.json'] && dadosGist.files['database.json'].content) ? JSON.parse(dadosGist.files['database.json'].content) : {};
 
-        DB = mesclarBancosDeDados(dbNuvem, DB);
+            DB = mesclarBancosDeDados(dbNuvem, DB);
+        }
 
         syncTimeLocal = Date.now(); 
         localStorage.setItem('db_backup', JSON.stringify(DB));
@@ -161,7 +161,7 @@ async function salvarDB() {
 
         if (!respostaPatch.ok) throw new Error('Erro ao salvar no GitHub.');
         const dadosGistAtualizado = await respostaPatch.json();
-        ultimaAtualizacaoGist = dadosGistAtualizado.updated_at || dadosGist.updated_at;
+        ultimaAtualizacaoGist = dadosGistAtualizado.updated_at;
 
         atualizarSelectsDinamicos(); 
         atualizarSelectProducao(); 
@@ -267,15 +267,13 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     });
 });
 
-// --- LÓGICA DE CONSUMO DAS IMPRESSORAS ---
+// --- LÓGICA DE CONSUMO DA IMPRESSORA (A1) ---
 function atualizarKWMaquina(prefix) {
-    const imp = document.getElementById(`${prefix}-impressora`).value;
     const mat = document.getElementById(`${prefix}-material`).value;
     const elKw = document.getElementById(`${prefix}-kw`);
     if (!elKw) return;
 
-    if (imp === 'A1') { elKw.value = mat === 'PLA' ? 0.095 : 0.200; }
-    else if (imp === 'P1S') { elKw.value = mat === 'PLA' ? 0.105 : 0.140; }
+    elKw.value = mat === 'PLA' ? 0.095 : 0.200;
 }
 
 ['calc', 'desc'].forEach(prefix => {
@@ -293,7 +291,7 @@ document.getElementById('form-filamento').addEventListener('submit', async (e) =
     const peso = parseFloat(document.getElementById('fil-peso').value);
     const preco = parseFloat(document.getElementById('fil-preco').value);
     const novoId = Date.now();
-    DB.filamentos.push({ id: novoId, lastModified: Date.now(), nome, localizacao: local, pesoInicial: peso, pesoRestante: peso, precoTotal: preco, custoPorGrama: preco / peso });
+    DB.filamentos.push({ id: novoId, lastModified: Date.now(), nome, localizacao: local, pesoInicial: peso, pesoRestante: peso, precoTotal: preco, custoPorGrama: preco / peso, valorRecuperado: 0 });
     DB.historicoGastos.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Compra: Rolo ${nome} [Lote #${novoId.toString().slice(-4)}]`, valor: preco });
     await salvarDB(); 
     document.getElementById('form-filamento').reset(); 
@@ -307,7 +305,7 @@ document.getElementById('form-extra').addEventListener('submit', async (e) => {
     const medida = document.getElementById('ext-medida').value;
     const qtd = parseFloat(document.getElementById('ext-qtd').value);
     const preco = parseFloat(document.getElementById('ext-preco').value);
-    DB.extras.push({ id: Date.now(), lastModified: Date.now(), nome, medida, qtdInicial: qtd, qtdRestante: qtd, precoTotal: preco, custoUnitario: preco / qtd });
+    DB.extras.push({ id: Date.now(), lastModified: Date.now(), nome, medida, qtdInicial: qtd, qtdRestante: qtd, precoTotal: preco, custoUnitario: preco / qtd, valorRecuperado: 0 });
     DB.historicoGastos.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Compra: Insumo ${nome}`, valor: preco });
     await salvarDB(); 
     document.getElementById('form-extra').reset(); 
@@ -319,19 +317,40 @@ function renderizarInventario() {
     const elFil = document.getElementById('lista-filamentos');
     if (!elFil) return; 
     elFil.innerHTML = '';
-    DB.filamentos.forEach(f => {
-        const perc = (f.pesoRestante / f.pesoInicial) * 100;
-        let cor = perc <= 15 ? 'stock-low' : (perc <= 50 ? 'stock-warn' : 'stock-good');
+    DB.filamentos.filter(f => !f.deleted).forEach(f => {
+        const percEstoque = (f.pesoRestante / f.pesoInicial) * 100;
+        let corEstoque = percEstoque <= 15 ? 'stock-low' : (percEstoque <= 50 ? 'stock-warn' : 'stock-good');
         const shortId = f.id.toString().slice(-4);
-        elFil.innerHTML += `<div class="item-card"><div class="item-title"><span style="color:var(--primary)">[#${shortId}]</span> ${f.nome} <div><button class="btn-small" onclick="editarFil(${f.id})" title="Editar Peso/Local">✏️</button><button class="btn-danger btn-small" onclick="apagarFil(${f.id})">X</button></div></div><div class="item-details"><span>📍 Local: <strong>${f.localizacao || 'Prateleira'}</strong></span><span>Custo: ${fmtDinheiro(f.custoPorGrama)}/g</span><span style="font-weight:bold;">Resta: ${fmtNum(f.pesoRestante)}g</span></div><div class="stock-bar-bg"><div class="stock-bar-fill ${cor}" style="width: ${perc}%"></div></div></div>`;
+        const recuperado = f.valorRecuperado || 0;
+        const isPago = recuperado >= f.precoTotal;
+        const percROI = f.precoTotal > 0 ? ((recuperado / f.precoTotal) * 100).toFixed(0) : '0';
+        elFil.innerHTML += `
+        <div class="item-card">
+            <div class="item-title">
+                <span style="color:var(--primary)">[#${shortId}]</span> ${f.nome}
+                <div><button class="btn-small" onclick="editarFil(${f.id})" title="Editar Peso/Local">✏️</button><button class="btn-danger btn-small" onclick="apagarFil(${f.id})">X</button></div>
+            </div>
+            <div class="item-details"><span>📍 Local: <strong>${f.localizacao || 'Prateleira'}</strong></span><span>Custo: ${fmtDinheiro(f.custoPorGrama)}/g</span><span style="font-weight:bold;">Resta: ${fmtNum(f.pesoRestante)}g</span></div>
+            <div class="stock-bar-bg"><div class="stock-bar-fill ${corEstoque}" style="width: ${percEstoque}%"></div></div>
+            <div style="margin-top: 1rem; font-size: 0.85rem; padding-top: 0.5rem; border-top: 1px dashed var(--border);"><div class="flex-between"><span style="color: var(--text-muted);">Retorno (ROI): <strong>${fmtDinheiro(recuperado)}</strong></span><span class="badge" style="background: ${isPago ? 'var(--success)' : 'var(--danger)'}; color: ${isPago ? '#000' : '#fff'}; font-size: 0.7rem;">${isPago ? '🟢 SE PAGOU' : '🔴 ' + percROI + '%'}</span></div></div>
+        </div>`;
     });
     const elExt = document.getElementById('lista-extras');
     elExt.innerHTML = '';
-    DB.extras.forEach(x => {
-        const perc = (x.qtdRestante / x.qtdInicial) * 100;
-        let cor = perc <= 15 ? 'stock-low' : (perc <= 50 ? 'stock-warn' : 'stock-good');
+    DB.extras.filter(x => !x.deleted).forEach(x => {
+        const percEstoque = (x.qtdRestante / x.qtdInicial) * 100;
+        let corEstoque = percEstoque <= 15 ? 'stock-low' : (percEstoque <= 50 ? 'stock-warn' : 'stock-good');
         const sigla = x.medida === 'Unidades' ? 'un' : x.medida;
-        elExt.innerHTML += `<div class="item-card"><div class="item-title">${x.nome} <div><button class="btn-small" onclick="editarExt(${x.id})">✏️</button><button class="btn-danger btn-small" onclick="apagarExt(${x.id})">X</button></div></div><div class="item-details"><span>Custo: ${fmtDinheiro(x.custoUnitario)}/un</span><span style="font-weight:bold;">Resta: ${fmtNum(x.qtdRestante)}</span></div><div class="stock-bar-bg"><div class="stock-bar-fill ${cor}" style="width: ${perc}%"></div></div></div>`;
+        const recuperado = x.valorRecuperado || 0;
+        const isPago = recuperado >= x.precoTotal;
+        const percROI = x.precoTotal > 0 ? ((recuperado / x.precoTotal) * 100).toFixed(0) : '0';
+        elExt.innerHTML += `
+        <div class="item-card">
+            <div class="item-title">${x.nome}<div><button class="btn-small" onclick="editarExt(${x.id})">✏️</button><button class="btn-danger btn-small" onclick="apagarExt(${x.id})">X</button></div></div>
+            <div class="item-details"><span>Custo: ${fmtDinheiro(x.custoUnitario)}/${sigla}</span><span style="font-weight:bold;">Resta: ${fmtNum(x.qtdRestante)}</span></div>
+            <div class="stock-bar-bg"><div class="stock-bar-fill ${corEstoque}" style="width: ${percEstoque}%"></div></div>
+            <div style="margin-top: 1rem; font-size: 0.85rem; padding-top: 0.5rem; border-top: 1px dashed var(--border);"><div class="flex-between"><span style="color: var(--text-muted);">Retorno (ROI): <strong>${fmtDinheiro(recuperado)}</strong></span><span class="badge" style="background: ${isPago ? 'var(--success)' : 'var(--danger)'}; color: ${isPago ? '#000' : '#fff'}; font-size: 0.7rem;">${isPago ? '🟢 SE PAGOU' : '🔴 ' + percROI + '%'}</span></div></div>
+        </div>`;
     });
 }
 
@@ -341,7 +360,12 @@ async function editarFil(id) {
     const novoPeso = prompt(`[1/2] Ajuste o peso atual (g) de ${fil.nome}:`, fil.pesoRestante);
 
     if (novoPeso !== null && novoPeso.trim() !== "") {
-        fil.pesoRestante = parseFloat(novoPeso.replace(',', '.'));
+        const valorConvertido = parseFloat(novoPeso.replace(',', '.'));
+        if (isNaN(valorConvertido) || valorConvertido < 0) {
+            alert("⚠️ Valor inválido. A operação foi cancelada.");
+            return;
+        }
+        fil.pesoRestante = valorConvertido;
         const novoLocal = prompt(`[2/2] Onde este rolo está agora?`, fil.localizacao || "Prateleira");
 
         if (novoLocal !== null && novoLocal.trim() !== "") {
@@ -365,7 +389,12 @@ async function editarExt(id) {
     if (!ext) return;
     const novaQtd = prompt(`Ajuste a qtd de ${ext.nome}:`, ext.qtdRestante);
     if (novaQtd !== null && novaQtd.trim() !== "") {
-        ext.qtdRestante = parseFloat(novaQtd.replace(',', '.'));
+        const valorConvertido = parseFloat(novaQtd.replace(',', '.'));
+        if (isNaN(valorConvertido) || valorConvertido < 0) {
+            alert("⚠️ Valor inválido. A operação foi cancelada.");
+            return;
+        }
+        ext.qtdRestante = valorConvertido;
         ext.lastModified = Date.now();
         if (ext.qtdRestante > ext.qtdInicial) {
             ext.qtdInicial = ext.qtdRestante;
@@ -376,8 +405,31 @@ async function editarExt(id) {
         atualizarSelectsDinamicos();
     }
 }
-async function apagarFil(id) { if (confirm("Apagar filamento?")) { DB.filamentos = DB.filamentos.filter(f => f.id !== id); await salvarDB(); renderizarInventario(); atualizarSelectsDinamicos(); } }
-async function apagarExt(id) { if (confirm("Apagar insumo?")) { DB.extras = DB.extras.filter(x => x.id !== id); await salvarDB(); renderizarInventario(); atualizarSelectsDinamicos(); } }
+async function apagarFil(id) { 
+    const emUso = DB.receitas.some(r => !r.deleted && r.filamentosUsados && r.filamentosUsados.some(f => f.id === id));
+    if (emUso) {
+        alert("⛔ Não é possível apagar. Este filamento está vinculado a receitas do catálogo. Altere as receitas primeiro.");
+        return;
+    }
+
+    if (confirm("Apagar filamento?")) { 
+        const fil = DB.filamentos.find(f => f.id === id);
+        if (fil) { fil.deleted = true; fil.lastModified = Date.now(); }
+        await salvarDB(); 
+        renderizarInventario(); 
+        atualizarSelectsDinamicos(); 
+    } 
+}
+
+async function apagarExt(id) { 
+    if (confirm("Apagar insumo?")) { 
+        const ext = DB.extras.find(x => x.id === id);
+        if (ext) { ext.deleted = true; ext.lastModified = Date.now(); }
+        await salvarDB(); 
+        renderizarInventario(); 
+        atualizarSelectsDinamicos(); 
+    } 
+}
 
 // --- SELECTS DINÂMICOS ---
 function formatarOpcaoFilamento(f) {
@@ -390,7 +442,7 @@ function atualizarSelectsDinamicos() {
         if (selectFil) {
             const valorAtual = selectFil.value;
             selectFil.innerHTML = i === 1 ? '<option value="">Selecione no Inventário...</option>' : '<option value="">Nenhum...</option>';
-            DB.filamentos.forEach(f => { const opt = document.createElement('option'); opt.value = f.id; opt.textContent = formatarOpcaoFilamento(f); selectFil.appendChild(opt); });
+            DB.filamentos.filter(f => !f.deleted).forEach(f => { const opt = document.createElement('option'); opt.value = f.id; opt.textContent = formatarOpcaoFilamento(f); selectFil.appendChild(opt); });
             selectFil.value = valorAtual;
         }
     }
@@ -416,7 +468,7 @@ function atualizarSelectsDinamicos() {
             if (selIns) {
                 const valIns = selIns.value; 
                 selIns.innerHTML = '<option value="">Selecione no Inventário...</option>';
-                DB.extras.forEach(x => { const opt = document.createElement('option'); opt.value = x.id; opt.textContent = `${x.nome} (Disp: ${fmtNum(x.qtdRestante)})`; selIns.appendChild(opt); });
+                DB.extras.filter(x => !x.deleted).forEach(x => { const opt = document.createElement('option'); opt.value = x.id; opt.textContent = `${x.nome} (Disp: ${fmtNum(x.qtdRestante)})`; selIns.appendChild(opt); });
                 selIns.value = valIns;
             }
         } else {
@@ -433,7 +485,7 @@ function atualizarSelectsDinamicos() {
                 if (selF) {
                     const valF = selF.value;
                     selF.innerHTML = i === 1 ? '<option value="">Selecione...</option>' : '<option value="">Nenhum...</option>';
-                    DB.filamentos.forEach(f => { const opt = document.createElement('option'); opt.value = f.id; opt.textContent = formatarOpcaoFilamento(f); selF.appendChild(opt); });
+                    DB.filamentos.filter(f => !f.deleted).forEach(f => { const opt = document.createElement('option'); opt.value = f.id; opt.textContent = formatarOpcaoFilamento(f); selF.appendChild(opt); });
                     selF.value = valF;
                 }
             }
@@ -443,11 +495,23 @@ function atualizarSelectsDinamicos() {
     const listaExt = document.getElementById('calc-lista-extras');
     if (listaExt) {
         listaExt.innerHTML = '';
-        DB.extras.forEach(x => {
+        DB.extras.filter(x => !x.deleted).forEach(x => {
             const sigla = x.medida === 'Unidades' ? 'un' : x.medida;
             listaExt.innerHTML += `<div class="flex-between" style="background: var(--bg-input); padding: 0.5rem; border-radius: 4px; border: 1px solid var(--border);"><div><strong>${x.nome}</strong> <span style="font-size: 0.8rem; color: var(--text-muted)">(${fmtDinheiro(x.custoUnitario)}/${sigla})</span></div><div><input type="number" class="calc-ext-uso" data-id="${x.id}" min="0" step="0.01" placeholder="0" style="width: 80px; padding: 0.4rem;"><span>${sigla}</span></div></div>`;
         });
     }
+
+    document.querySelectorAll('.venda-insumo-select').forEach(select => {
+        const valAtual = select.value;
+        select.innerHTML = '<option value="">Nenhuma / Nenhum...</option>';
+        DB.extras.filter(x => !x.deleted).forEach(x => {
+            const opt = document.createElement('option');
+            opt.value = x.id;
+            opt.textContent = `${x.nome} (Disp: ${fmtNum(x.qtdRestante)})`;
+            select.appendChild(opt);
+        });
+        select.value = valAtual;
+    });
 }
 const elDescTipo = document.getElementById('desc-tipo'); 
 if (elDescTipo) elDescTipo.addEventListener('change', atualizarSelectsDinamicos);
@@ -456,8 +520,13 @@ if (elDescTipo) elDescTipo.addEventListener('change', atualizarSelectsDinamicos)
 document.getElementById('form-calc').addEventListener('submit', (e) => {
     e.preventDefault();
     const impressoraUsada = document.getElementById('calc-impressora').value;
-    const nomeProduto = document.getElementById('calc-nome').value + ` (${impressoraUsada})`;
+    const nomeProduto = document.getElementById('calc-nome').value;
     const rende = parseInt(document.getElementById('calc-rende').value) || 1;
+    let exibirVitrineAntigo = false;
+    if (editandoReceitaId) {
+        const recAntiga = DB.receitas.find(r => r.id === editandoReceitaId);
+        if (recAntiga) exibirVitrineAntigo = recAntiga.exibirVitrine;
+    }
 
     let custoFil = 0; 
     let filamentosUsados = [];
@@ -529,7 +598,8 @@ document.getElementById('form-calc').addEventListener('submit', (e) => {
         filamentosUsados, 
         extrasUsados, 
         params: { h, m, kw, precoKwh },
-        fotoUrl: fotoUrlAtual
+        fotoUrl: fotoUrlAtual,
+        exibirVitrine: exibirVitrineAntigo
     };
     atualizarSimulacaoShopee(shopeeM5, custoUnitario);
     document.getElementById('painel-resultados').style.display = 'block';
@@ -630,7 +700,7 @@ function renderizarCatalogo() {
         el.innerHTML = '<p class="ajuda">Nenhuma receita salva.</p>'; 
         return; 
     }
-    DB.receitas.forEach(r => {
+    DB.receitas.filter(r => !r.deleted).forEach(r => {
         let fillTxt = (r.filamentosUsados && Array.isArray(r.filamentosUsados))
             ? r.filamentosUsados.map(f => `${fmtNum(f.peso)}g de ${f.nome}`).join(', ')
             : 'Nenhum';
@@ -705,7 +775,8 @@ function editarReceita(id) {
 
 async function apagarReceita(id) { 
     if (confirm("Excluir esta receita?")) { 
-        DB.receitas = DB.receitas.filter(r => r.id !== id); 
+        const rec = DB.receitas.find(r => r.id === id);
+        if (rec) { rec.deleted = true; rec.lastModified = Date.now(); }
         await salvarDB(); 
         renderizarCatalogo(); 
         atualizarSelectProducao(); 
@@ -717,7 +788,7 @@ function atualizarSelectProducao() {
     const sel = document.getElementById('prod-receita'); 
     if (!sel) return; 
     sel.innerHTML = '<option value="">Selecione um produto salvo...</option>';
-    DB.receitas.forEach(r => { 
+    DB.receitas.filter(r => !r.deleted).forEach(r => { 
         const opt = document.createElement('option'); 
         opt.value = r.id; 
         opt.textContent = `${r.nome} (Custo Un.: ${fmtDinheiro(r.custoUnitario)})`; 
@@ -725,12 +796,17 @@ function atualizarSelectProducao() {
     });
 }
 
+let processandoProducao = false;
+
 document.getElementById('form-producao').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (processandoProducao) return;
     const receitaId = parseInt(document.getElementById('prod-receita').value);
     const receita = DB.receitas.find(r => r.id === receitaId); 
     if (!receita) return;
 
+    processandoProducao = true;
+    try {
     const qtdTotalProduzida = parseInt(document.getElementById('prod-qtd').value);
     const qtdPerdida = parseInt(prompt(`Das ${qtdTotalProduzida} unidades, quantas deram erro/descarte?`, "0")) || 0;
     if (qtdPerdida > qtdTotalProduzida) { 
@@ -745,21 +821,24 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     }
 
     const rendePadrao = receita.rende || 1;
+    const numeroFornadas = Math.ceil(qtdTotalProduzida / rendePadrao);
     const fatorGastoFilamento = qtdTotalProduzida / rendePadrao;
     const fatorGastoInsumo = descontarInsumosDaPerda ? (qtdTotalProduzida / rendePadrao) : (qtdSucesso / rendePadrao);
 
     let energiaFornada = 0;
     if (receita.params) energiaFornada = (receita.params.h + (receita.params.m / 60)) * receita.params.kw * receita.params.precoKwh;
-    const energiaTotalProducao = energiaFornada * fatorGastoFilamento;
-    const energiaAtual = DB.energiaAcumulada?.valor !== undefined ? DB.energiaAcumulada.valor : (DB.energiaAcumulada || 0);
-    DB.energiaAcumulada = { valor: energiaAtual + energiaTotalProducao, lastModified: Date.now() };
+    const energiaTotalProducao = energiaFornada * numeroFornadas;
 
     if (receita.filamentosUsados && Array.isArray(receita.filamentosUsados)) {
+        let agrupamentoReq = {};
         for (let fUsado of receita.filamentosUsados) {
-            const fil = DB.filamentos.find(f => f.id === fUsado.id);
-            if (!fil || fil.pesoRestante < (fUsado.peso * fatorGastoFilamento)) { 
-                alert(`Falta o filamento: ${fil ? fil.nome : 'Desconhecido'}`); 
-                return; 
+            agrupamentoReq[fUsado.id] = (agrupamentoReq[fUsado.id] || 0) + (fUsado.peso * fatorGastoFilamento);
+        }
+        for (const [idStr, pesoReq] of Object.entries(agrupamentoReq)) {
+            const fil = DB.filamentos.find(f => f.id === parseInt(idStr));
+            if (!fil || fil.pesoRestante < pesoReq) {
+                alert(`Falta o filamento: ${fil ? fil.nome : 'Desconhecido'} (Necessário: ${fmtNum(pesoReq)}g)`);
+                return;
             }
         }
     }
@@ -773,6 +852,9 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
             }
         }
     }
+
+    const energiaAtual = DB.energiaAcumulada?.valor !== undefined ? DB.energiaAcumulada.valor : (DB.energiaAcumulada || 0);
+    DB.energiaAcumulada = { valor: energiaAtual + energiaTotalProducao, lastModified: Date.now() };
 
     if (receita.filamentosUsados && Array.isArray(receita.filamentosUsados)) {
         receita.filamentosUsados.forEach(fUsado => { 
@@ -834,6 +916,9 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
     alert(`Resumo:\nSucesso: ${qtdSucesso}\nDescarte: ${qtdPerdida}`); 
     document.getElementById('form-producao').reset(); 
     renderizarHistoricos();
+    } finally {
+        processandoProducao = false;
+    }
 });
 
 document.getElementById('form-descarte').addEventListener('submit', async (e) => {
@@ -1085,50 +1170,154 @@ const calcularPrevVendaOnline = () => {
     const qtd = parseInt(document.getElementById('venda-on-qtd').value) || 0;
     const precoUni = parseFloat(document.getElementById('venda-on-preco').value) || 0;
     const plataforma = document.getElementById('venda-on-plataforma').value;
+    const elConta = document.getElementById('venda-on-conta');
+    const isCnpj = elConta ? elConta.value === 'CNPJ' : true;
 
     const elCusto = document.getElementById('prev-on-custo'); 
     const elTaxa = document.getElementById('prev-on-taxa'); 
+    const elInvestimento = document.getElementById('prev-on-investimento');
     const elLucro = document.getElementById('prev-on-lucro');
 
     if (!prodId || qtd <= 0 || precoUni <= 0) { 
-        elCusto.textContent = "R$ 0,00"; elTaxa.textContent = "R$ 0,00"; elLucro.textContent = "R$ 0,00"; return; 
+        elCusto.textContent = "R$ 0,00"; elTaxa.textContent = "R$ 0,00"; elInvestimento.textContent = "R$ 0,00"; elLucro.textContent = "R$ 0,00"; return; 
     }
 
     const produto = DB.estoqueProntos.find(p => p.id === prodId); 
     if (!produto) return;
 
+    let custoEmbalagem = 0;
+    const idEmb1 = parseInt(document.getElementById('venda-on-emb1').value);
+    const qtdEmb1 = parseFloat(document.getElementById('venda-on-emb1-qtd').value) || 0;
+    if (idEmb1 && qtdEmb1 > 0) {
+        const ext1 = DB.extras.find(e => e.id === idEmb1);
+        if (ext1) custoEmbalagem += ext1.custoUnitario * qtdEmb1;
+    }
+    const idEmb2 = parseInt(document.getElementById('venda-on-emb2').value);
+    const qtdEmb2 = parseFloat(document.getElementById('venda-on-emb2-qtd').value) || 0;
+    if (idEmb2 && qtdEmb2 > 0) {
+        const ext2 = DB.extras.find(e => e.id === idEmb2);
+        if (ext2) custoEmbalagem += ext2.custoUnitario * qtdEmb2;
+    }
+
     const custoTotalFab = produto.custoUnitario * qtd;
     const receitaBruta = precoUni * qtd;
     const regra = MOTOR_TAXAS[plataforma];
-    const taxaTotal = calcularTaxaVenda(precoUni, qtd, regra);
-    const lucroLiquido = receitaBruta - custoTotalFab - taxaTotal;
+    const taxaTotal = calcularTaxaVenda(precoUni, qtd, regra, isCnpj);
+    const liquidoRecebido = receitaBruta - taxaTotal;
+    const parcelaCusto = custoTotalFab + custoEmbalagem;
+    const parcelaInvestimento = custoTotalFab;
+    const parcelaLucroLivre = liquidoRecebido - parcelaCusto;
 
-    elCusto.textContent = fmtDinheiro(custoTotalFab); 
+    elCusto.textContent = fmtDinheiro(parcelaCusto); 
     elTaxa.textContent = fmtDinheiro(taxaTotal); 
-    elLucro.textContent = fmtDinheiro(lucroLiquido);
-    elLucro.className = lucroLiquido >= 0 ? 'text-success' : 'text-danger';
+    elInvestimento.textContent = fmtDinheiro(parcelaInvestimento);
+    elLucro.textContent = fmtDinheiro(parcelaLucroLivre);
+    elLucro.className = parcelaLucroLivre >= 0 ? 'text-success' : 'text-danger';
 };
 
 // Gatilhos de Input
 ['venda-pdv-produto', 'venda-pdv-qtd', 'venda-pdv-preco', 'venda-pdv-metodo'].forEach(id => {
     document.getElementById(id).addEventListener('input', calcularPrevVendaPDV);
 });
-['venda-on-produto', 'venda-on-qtd', 'venda-on-preco', 'venda-on-plataforma'].forEach(id => {
-    document.getElementById(id).addEventListener('input', calcularPrevVendaOnline);
+['venda-on-produto', 'venda-on-qtd', 'venda-on-preco', 'venda-on-plataforma', 'venda-on-conta'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', calcularPrevVendaOnline);
+    if (el) el.addEventListener('change', calcularPrevVendaOnline);
+});
+['venda-on-emb1', 'venda-on-emb1-qtd', 'venda-on-emb2', 'venda-on-emb2-qtd'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', calcularPrevVendaOnline);
+    if (el) el.addEventListener('change', calcularPrevVendaOnline);
 });
 
 // 5. Finalização de Vendas (Processamento do Estoque e DB)
 async function processarVenda(tipoVenda, formValues) {
-    const { prodId, qtd, precoUni, canalOrMetodo, rastreio } = formValues;
+    const { prodId, qtd, precoUni, canalOrMetodo, rastreio, isCnpj = true } = formValues;
     const produto = DB.estoqueProntos.find(p => p.id === prodId); 
     
-    if (qtd > produto.quantidade) { alert("Estoque insuficiente!"); return; }
+    if (!produto || qtd > produto.quantidade) { alert("Estoque de peças insuficiente!"); return; }
+
+    let custoEmbalagem = 0;
+    const embalagens = [];
+    if (tipoVenda === 'Online') {
+        const idEmb1 = parseInt(document.getElementById('venda-on-emb1').value);
+        const qtdEmb1 = parseFloat(document.getElementById('venda-on-emb1-qtd').value) || 0;
+        if (idEmb1 && qtdEmb1 > 0) embalagens.push({ id: idEmb1, qtd: qtdEmb1, mensagem: 'Embalagem 1' });
+
+        const idEmb2 = parseInt(document.getElementById('venda-on-emb2').value);
+        const qtdEmb2 = parseFloat(document.getElementById('venda-on-emb2-qtd').value) || 0;
+        if (idEmb2 && qtdEmb2 > 0) embalagens.push({ id: idEmb2, qtd: qtdEmb2, mensagem: 'Embalagem 2 (Fita/Bolha)' });
+
+        const qtdPorInsumo = {};
+        embalagens.forEach(emb => { qtdPorInsumo[emb.id] = (qtdPorInsumo[emb.id] || 0) + emb.qtd; });
+        for (const [idStr, qtdNecessaria] of Object.entries(qtdPorInsumo)) {
+            const ext = DB.extras.find(e => e.id === parseInt(idStr));
+            if (!ext || ext.qtdRestante < qtdNecessaria) {
+                const embalagem = embalagens.find(emb => emb.id === parseInt(idStr));
+                alert(`Estoque da ${embalagem ? embalagem.mensagem : 'embalagem'} insuficiente!`);
+                return;
+            }
+        }
+        embalagens.forEach(emb => {
+            const ext = DB.extras.find(e => e.id === emb.id);
+            ext.qtdRestante -= emb.qtd;
+            ext.lastModified = Date.now();
+            custoEmbalagem += ext.custoUnitario * emb.qtd;
+        });
+    }
 
     const custoTotalFab = produto.custoUnitario * qtd; 
     const receitaBruta = precoUni * qtd;
     const regra = MOTOR_TAXAS[canalOrMetodo];
-    const taxaTotal = calcularTaxaVenda(precoUni, qtd, regra);
-    const lucroLiquido = receitaBruta - custoTotalFab - taxaTotal;
+    const taxaTotal = calcularTaxaVenda(precoUni, qtd, regra, isCnpj);
+    const liquidoRecebido = receitaBruta - taxaTotal;
+    const parcelaCusto = custoTotalFab + custoEmbalagem;
+    const parcelaInvestimento = custoTotalFab;
+    const lucroLivre = liquidoRecebido - parcelaCusto;
+
+    if (parcelaCusto > 0 && liquidoRecebido > 0) {
+        const receitaOrig = DB.receitas.find(r => r.id === produto.receitaId);
+        if (receitaOrig) {
+            const rendePadrao = receitaOrig.rende || 1;
+
+            if (receitaOrig.filamentosUsados && Array.isArray(receitaOrig.filamentosUsados)) {
+                receitaOrig.filamentosUsados.forEach(fUsado => {
+                    const fil = DB.filamentos.find(f => f.id === fUsado.id);
+                    if (fil) {
+                        const custoMaterial = (fUsado.peso / rendePadrao) * fUsado.custoRef * qtd;
+                        const fracao = custoMaterial / parcelaCusto;
+                        const novoRetorno = (fil.valorRecuperado || 0) + (liquidoRecebido * fracao);
+                        fil.valorRecuperado = Math.min(novoRetorno, fil.precoTotal);
+                        fil.lastModified = Date.now();
+                    }
+                });
+            }
+
+            if (receitaOrig.extrasUsados && Array.isArray(receitaOrig.extrasUsados)) {
+                receitaOrig.extrasUsados.forEach(eUsado => {
+                    const ext = DB.extras.find(ex => ex.id === eUsado.id);
+                    if (ext) {
+                        const custoMaterial = (eUsado.qtd / rendePadrao) * eUsado.custoRef * qtd;
+                        const fracao = custoMaterial / parcelaCusto;
+                        const novoRetorno = (ext.valorRecuperado || 0) + (liquidoRecebido * fracao);
+                        ext.valorRecuperado = Math.min(novoRetorno, ext.precoTotal);
+                        ext.lastModified = Date.now();
+                    }
+                });
+            }
+        }
+
+        if (tipoVenda === 'Online') {
+            embalagens.forEach(emb => {
+                const ext = DB.extras.find(e => e.id === emb.id);
+                if (ext) {
+                    const novoRetorno = (ext.valorRecuperado || 0) + (liquidoRecebido * ((ext.custoUnitario * emb.qtd) / parcelaCusto));
+                    ext.valorRecuperado = Math.min(novoRetorno, ext.precoTotal);
+                    ext.lastModified = Date.now();
+                }
+            });
+        }
+    }
     
     produto.quantidade -= qtd; 
     produto.lastModified = Date.now();
@@ -1146,13 +1335,16 @@ async function processarVenda(tipoVenda, formValues) {
         tipoVenda: tipoVenda,
         plataforma: canalOrMetodo, 
         precoVendaTotal: receitaBruta, 
-        taxa: taxaTotal, 
-        lucroLiquido: lucroLiquido,
+        taxa: taxaTotal,
+        custoReposicao: parcelaCusto,
+        valorInvestimento: parcelaInvestimento,
+        lucroLiquido: lucroLivre,
         rastreio: rastreio || null
     });
 
     await salvarDB(); 
     alert(`✅ Venda ${tipoVenda} registrada com sucesso!`); 
+    renderizarInventario();
     renderizarAbaVendas(); 
     renderizarHistoricos();
 }
@@ -1172,11 +1364,13 @@ document.getElementById('form-venda-pdv').addEventListener('submit', (e) => {
 
 document.getElementById('form-venda-online').addEventListener('submit', (e) => {
     e.preventDefault();
+    const isCnpj = document.getElementById('venda-on-conta').value === 'CNPJ';
     processarVenda('Online', {
         prodId: parseInt(document.getElementById('venda-on-produto').value),
         qtd: parseInt(document.getElementById('venda-on-qtd').value),
         precoUni: parseFloat(document.getElementById('venda-on-preco').value),
         canalOrMetodo: document.getElementById('venda-on-plataforma').value,
+        isCnpj,
         rastreio: document.getElementById('venda-on-rastreio').value
     }).then(() => {
         document.getElementById('form-venda-online').reset();
@@ -1188,16 +1382,18 @@ document.getElementById('form-venda-online').addEventListener('submit', (e) => {
 function renderizarHistoricos() {
     const totalEntrouBruto = DB.historicoVendas.reduce((acc, v) => acc + v.precoVendaTotal, 0); 
     const totalTaxas = DB.historicoVendas.reduce((acc, v) => acc + (v.taxa || 0), 0);
-    const totalEntrou = totalEntrouBruto - totalTaxas; 
+    const totalEntrouLiquido = totalEntrouBruto - totalTaxas; 
     const totalSaiu = DB.historicoGastos ? DB.historicoGastos.reduce((acc, g) => acc + g.valor, 0) : 0;
-    const lucroLiquido = totalEntrou - totalSaiu;
+    const caixaInvestimento = DB.historicoVendas.reduce((acc, v) => acc + (v.valorInvestimento || 0), 0);
+    const lucroLivreTotal = DB.historicoVendas.reduce((acc, v) => acc + (v.lucroLiquido || 0), 0);
 
-    document.getElementById('dash-entrou').textContent = fmtDinheiro(totalEntrou); 
+    document.getElementById('dash-entrou').textContent = fmtDinheiro(totalEntrouLiquido); 
     document.getElementById('dash-saiu').textContent = fmtDinheiro(totalSaiu);
+    document.getElementById('dash-investimento').textContent = fmtDinheiro(caixaInvestimento);
     document.getElementById('dash-energia').textContent = fmtDinheiro(DB.energiaAcumulada?.valor ?? DB.energiaAcumulada ?? 0);
-    const elLucro = document.getElementById('dash-lucro'); 
-    elLucro.textContent = fmtDinheiro(lucroLiquido); 
-    elLucro.className = lucroLiquido >= 0 ? 'text-success' : 'text-danger';
+    const elLucro = document.getElementById('dash-lucro-livre'); 
+    elLucro.textContent = fmtDinheiro(lucroLivreTotal); 
+    elLucro.className = lucroLivreTotal >= 0 ? 'text-success' : 'text-danger';
 
     const elVendas = document.getElementById('lista-historico-vendas'); 
     elVendas.innerHTML = '';
@@ -1219,7 +1415,7 @@ function renderizarHistoricos() {
                 Recebido Líquido: ${fmtDinheiro(v.precoVendaTotal - v.taxa)} (Taxas: ${fmtDinheiro(v.taxa)})
             </div>
             <div class="res-row destaque" style="border:none; padding:0; margin-top:0.3rem;">
-                <span>Lucro Real da Venda:</span>
+                <span>Lucro Livre da Venda:</span>
                 <strong class="text-success">${fmtDinheiro(v.lucroLiquido)}</strong>
             </div>
         </div>`; 
@@ -1281,13 +1477,18 @@ function renderizarDetalhamentoMes() {
             const desc = g.descricao.toLowerCase();
             if (desc.includes("compra")) comprasMaterial += g.valor;
             else if (desc.includes("energia")) gastosEnergia += g.valor;
-            else if (desc.includes("perda")) perdasDescarte += g.valor;
-            else if (desc.includes("embalagem") || desc.includes("frete")) gastosLogistica += g.valor;
-            else comprasMaterial += g.valor; // Outros
+            else if (!desc.includes("perda")) gastosLogistica += g.valor;
         }
     });
 
-    const lucroOperacional = totalBruto - (taxasPlataforma + comprasMaterial + gastosEnergia + gastosLogistica + perdasDescarte);
+    DB.historicoPerdas.forEach(p => {
+        const [diaP, mesP, anoP] = p.data.split('/');
+        if (mesP === mesFiltro && anoP === anoFiltro) {
+            perdasDescarte += (p.custoTotal || 0);
+        }
+    });
+
+    const fluxoCaixaMensal = totalBruto - (taxasPlataforma + comprasMaterial + gastosEnergia + gastosLogistica);
 
     const painel = document.getElementById('painel-detalhamento-mes');
     painel.innerHTML = `
@@ -1312,8 +1513,8 @@ function renderizarDetalhamentoMes() {
             <strong style="font-size: 1.2rem; color: var(--danger);">-${fmtDinheiro(perdasDescarte)}</strong>
         </div>
         <div style="background: var(--primary); padding: 1rem; border-radius: 4px; grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 0.9rem; color: #fff; font-weight: bold;">Lucro Operacional do Mês:</div>
-            <strong style="font-size: 1.4rem; color: #fff;">${fmtDinheiro(lucroOperacional)}</strong>
+            <div style="font-size: 0.9rem; color: #fff; font-weight: bold;">Fluxo de Caixa do Mês:</div>
+            <strong style="font-size: 1.4rem; color: #fff;">${fmtDinheiro(fluxoCaixaMensal)}</strong>
         </div>
     `;
 }

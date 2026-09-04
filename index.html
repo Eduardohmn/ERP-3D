@@ -47,32 +47,32 @@
                                     id="calc-filamento-1" class="calc-filamento-select" required>
                                     <option value="">Selecione...</option>
                                 </select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-1"
-                                    step="0.1" required></div>
+                                <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-1"
+                                    min="0.01" step="0.1" required></div>
                         </div>
                         <div class="form-row">
                             <div class="form-col" style="flex: 2;"><label>Cor 2 (Opcional):</label><select
                                     id="calc-filamento-2" class="calc-filamento-select">
                                     <option value="">Nenhum...</option>
                                 </select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-2"
-                                    step="0.1" placeholder="0"></div>
+                                <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-2"
+                                    min="0.01" step="0.1" placeholder="0"></div>
                         </div>
                         <div class="form-row">
                             <div class="form-col" style="flex: 2;"><label>Cor 3 (Opcional):</label><select
                                     id="calc-filamento-3" class="calc-filamento-select">
                                     <option value="">Nenhum...</option>
                                 </select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-3"
-                                    step="0.1" placeholder="0"></div>
+                                <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-3"
+                                    min="0.01" step="0.1" placeholder="0"></div>
                         </div>
                         <div class="form-row">
                             <div class="form-col" style="flex: 2;"><label>Cor 4 (Opcional):</label><select
                                     id="calc-filamento-4" class="calc-filamento-select">
                                     <option value="">Nenhum...</option>
                                 </select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-4"
-                                    step="0.1" placeholder="0"></div>
+                                <div class="form-col"><label>Peso (g):</label><input type="number" id="calc-peso-4"
+                                    min="0.01" step="0.1" placeholder="0"></div>
                         </div>
                     </fieldset>
 
@@ -83,7 +83,6 @@
                                 <label>Impressora:</label>
                                 <select id="calc-impressora" required>
                                     <option value="A1">Bambu Lab A1</option>
-                                    <option value="P1S">Bambu Lab P1S / P2S</option>
                                 </select>
                             </div>
                             <div class="form-col">
@@ -228,32 +227,32 @@
                                     id="desc-filamento-1" required>
                                     <option value="">Selecione no Inventário...</option>
                                 </select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-1"
-                                    step="0.1" required></div>
+                                <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-1"
+                                    min="0.01" step="0.1" required></div>
                         </div>
                         <div class="form-row">
                             <div class="form-col" style="flex: 2;"><label>Cor 2 (Opcional):</label><select
                                     id="desc-filamento-2">
                                     <option value="">Nenhum...</option>
                                 </select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-2"
-                                    step="0.1" placeholder="0"></div>
+                                <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-2"
+                                    min="0.01" step="0.1" placeholder="0"></div>
                         </div>
                         <div class="form-row">
                             <div class="form-col" style="flex: 2;"><label>Cor 3 (Opcional):</label><select
                                     id="desc-filamento-3">
                                     <option value="">Nenhum...</option>
                                 </select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-3"
-                                    step="0.1" placeholder="0"></div>
+                                <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-3"
+                                    min="0.01" step="0.1" placeholder="0"></div>
                         </div>
                         <div class="form-row">
                             <div class="form-col" style="flex: 2;"><label>Cor 4 (Opcional):</label><select
                                     id="desc-filamento-4">
                                     <option value="">Nenhum...</option>
                                 </select></div>
-                            <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-4"
-                                    step="0.1" placeholder="0"></div>
+                                <div class="form-col"><label>Peso (g):</label><input type="number" id="desc-peso-4"
+                                    min="0.01" step="0.1" placeholder="0"></div>
                         </div>
                     </fieldset>
 
@@ -275,7 +274,6 @@
                                 <label>Impressora:</label>
                                 <select id="desc-impressora">
                                     <option value="A1">Bambu Lab A1</option>
-                                    <option value="P1S">Bambu Lab P1S / P2S</option>
                                 </select>
                             </div>
                             <div class="form-col">
@@ -323,9 +321,9 @@
                     </div>
                     <div class="form-row">
                         <div class="form-col"><label>Peso do Rolo (g):</label><input type="number" id="fil-peso"
-                                step="1" required placeholder="Ex: 1000"></div>
+                            min="0.01" step="1" required placeholder="Ex: 1000"></div>
                         <div class="form-col"><label>Preço Pago (R$):</label><input type="number" id="fil-preco"
-                                step="0.01" required placeholder="Ex: 119.90"></div>
+                            min="0.01" step="0.01" required placeholder="Ex: 119.90"></div>
                     </div>
                     <button type="submit">Cadastrar Filamento (Gerar Lote ID)</button>
                 </form>
@@ -352,9 +350,9 @@
                     </div>
                     <div class="form-row">
                         <div class="form-col"><label>Quantidade Comprada:</label><input type="number" id="ext-qtd"
-                                step="0.01" required placeholder="Ex: 100"></div>
+                            min="0.01" step="0.01" required placeholder="Ex: 100"></div>
                         <div class="form-col"><label>Preço Pago (R$):</label><input type="number" id="ext-preco"
-                                step="0.01" required placeholder="Ex: 25.00"></div>
+                            min="0.01" step="0.01" required placeholder="Ex: 25.00"></div>
                     </div>
                     <button type="submit">Cadastrar Insumo</button>
                 </form>
@@ -434,6 +432,13 @@
                                 <option value="Site">Site SixWolves</option>
                             </select>
                         </div>
+                        <div class="form-col">
+                            <label>Tipo de Conta (Shopee):</label>
+                            <select id="venda-on-conta">
+                                <option value="CPF">CPF (+ R$ 3,00 taxa fixa)</option>
+                                <option value="CNPJ" selected>CNPJ (Padrão)</option>
+                            </select>
+                        </div>
                         <div class="form-col"><label>Preço de Venda Un. (R$):</label>
                             <input type="number" id="venda-on-preco" step="0.01" required>
                         </div>
@@ -443,11 +448,35 @@
                             <input type="text" id="venda-on-rastreio" placeholder="BR123456789BR">
                         </div>
                     </div>
+                    <fieldset style="border-color: var(--shopee); margin-bottom: 1.2rem;">
+                        <legend>📦 Embalagem (Desconta do Inventário)</legend>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label>Caixa / Envelope:</label>
+                                <select id="venda-on-emb1" class="venda-insumo-select"><option value="">Nenhuma...</option></select>
+                            </div>
+                            <div class="form-col">
+                                <label>Qtd:</label>
+                                <input type="number" id="venda-on-emb1-qtd" min="0" step="1" value="1">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-col">
+                                <label>Plástico Bolha / Fita (cm ou m):</label>
+                                <select id="venda-on-emb2" class="venda-insumo-select"><option value="">Nenhum...</option></select>
+                            </div>
+                            <div class="form-col">
+                                <label>Qtd:</label>
+                                <input type="number" id="venda-on-emb2-qtd" min="0" step="0.01" value="0">
+                            </div>
+                        </div>
+                    </fieldset>
                     <!-- Preview Online -->
                     <div class="prev-venda-box" style="background: var(--bg-input); padding: 1rem; border-radius: 4px; margin-bottom: 1rem; border: 1px dashed var(--border);">
-                        <div class="res-row"><span>Custo Fab.+Emb.:</span> <strong id="prev-on-custo">R$ 0,00</strong></div>
-                        <div class="res-row"><span>Comissão + Fixo:</span> <strong id="prev-on-taxa" class="text-danger">R$ 0,00</strong></div>
-                        <div class="res-row destaque"><span>LUCRO LÍQUIDO:</span> <strong id="prev-on-lucro">R$ 0,00</strong></div>
+                        <div class="res-row"><span>1. Custo (Peça + Emb.):</span> <strong id="prev-on-custo">R$ 0,00</strong></div>
+                        <div class="res-row"><span>2. Taxas da Plataforma:</span> <strong id="prev-on-taxa" class="text-danger">R$ 0,00</strong></div>
+                        <div class="res-row" style="color: var(--warning);"><span>3. Caixa P/ Investimento:</span> <strong id="prev-on-investimento">R$ 0,00</strong></div>
+                        <div class="res-row destaque"><span>4. LUCRO LIVRE (Seu bolso):</span> <strong id="prev-on-lucro">R$ 0,00</strong></div>
                     </div>
                     <button type="submit" style="width: 100%; background: var(--shopee);">📦 Confirmar Venda Online</button>
                 </form>
@@ -468,15 +497,13 @@
                         style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">TOTAL SAIU</span>
                     <h2 id="dash-saiu" class="text-danger" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
                 </div>
-                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);"><span
-                        style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">LUCRO REAL</span>
-                    <h2 id="dash-lucro" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
+                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">LUCRO LIVRE</span>
+                    <h2 id="dash-lucro-livre" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
                 </div>
-                <div
-                    style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
-                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">META INVEST.</span>
-                    <h2 style="margin-top: 0.5rem; color: var(--warning); font-size: 1.25rem; white-space: nowrap;">R$
-                        15.703,00</h2>
+                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
+                    <span style="font-size: 0.85rem; color: var(--warning); font-weight: bold;">CAIXA P/ INVESTIMENTO</span>
+                    <h2 id="dash-investimento" style="margin-top: 0.5rem; color: var(--warning); font-size: 1.4rem;">R$ 0,00</h2>
                 </div>
                 <div style="text-align: center; padding: 0.5rem;"><span
                         style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">LUZ PENDENTE</span>
