@@ -486,15 +486,14 @@
         <!-- ABA 6: HISTÓRICO GERAL -->
         <div id="tab-hist" class="tab-content">
             <h1>Painel Financeiro & Relatórios</h1>
-            <div class="card"
-                style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; background: #161616; border: 1px solid var(--border); margin-bottom: 2rem;">
-                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);"><span
-                        style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">ENTROU (LÍQUIDO)</span>
-                    <h2 id="dash-entrou" class="text-success" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00
-                    </h2>
+            <!-- PAINEL FINANCEIRO TOP -->
+            <div class="card" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; background: #161616; border: 1px solid var(--border); margin-bottom: 2rem;">
+                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">ENTROU (LÍQUIDO)</span>
+                    <h2 id="dash-entrou" class="text-success" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
                 </div>
-                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);"><span
-                        style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">TOTAL SAIU</span>
+                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">TOTAL SAIU</span>
                     <h2 id="dash-saiu" class="text-danger" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
                 </div>
                 <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border);">
@@ -502,15 +501,20 @@
                     <h2 id="dash-lucro-livre" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
                 </div>
                 <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center; overflow: hidden;">
-                    <span style="font-size: 0.85rem; color: var(--warning); font-weight: bold;">CAIXA P/ INVESTIMENTO</span>
-                    <h2 id="dash-investimento" style="margin-top: 0.5rem; color: var(--warning); font-size: 1.4rem;">R$ 0,00</h2>
+                    <span style="font-size: 0.85rem; color: var(--warning); font-weight: bold;">CAIXA INVESTIMENTO</span>
+                    <h2 id="dash-investimento" style="margin-top: 0.5rem; font-size: 1.4rem;">R$ 0,00</h2>
                 </div>
-                <div style="text-align: center; padding: 0.5rem;"><span
-                        style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">LUZ PENDENTE</span>
+                <div style="text-align: center; padding: 0.5rem; border-right: 1px solid var(--border); display: flex; flex-direction: column; justify-content: center;">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">META MÁQUINA (R$ 5.600)</span>
+                    <div class="stock-bar-bg" style="margin-top: 0.5rem; height: 8px;">
+                        <div id="dash-meta-bar" class="stock-bar-fill stock-good" style="width: 0%;"></div>
+                    </div>
+                    <span id="dash-meta-perc" style="font-size: 0.8rem; margin-top: 0.3rem;">0%</span>
+                </div>
+                <div style="text-align: center; padding: 0.5rem;">
+                    <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">LUZ PENDENTE</span>
                     <h2 id="dash-energia" style="margin-top: 0.5rem; color: #ffeb3b; font-size: 1.4rem;">R$ 0,00</h2>
-                    <button id="btn-pagar-energia"
-                        style="margin-top: 0.5rem; background: #ffeb3b; color: #000; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; padding: 0.3rem;">💸
-                        Pagar Luz</button>
+                    <button id="btn-pagar-energia" style="margin-top: 0.5rem; background: #ffeb3b; color: #000; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; padding: 0.3rem;">💸 Pagar Luz</button>
                 </div>
             </div>
             <!-- NOVO: Detalhamento de Gastos Mensais -->

@@ -19,7 +19,7 @@ let GIST_ID = localStorage.getItem('gist_id');
 // =======================================================================
 // 🔄 SISTEMA DE VERIFICAÇÃO DE VERSÃO (ANTI-CACHE E CONFLITOS)
 // =======================================================================
-const VERSAO_ATUAL = "1.0.10"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
+const VERSAO_ATUAL = "1.0.11"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
 const INTERVALO_VERIFICACAO = 3 * 60 * 1000; // 3 minutos (em milissegundos)
 let ultimaAtualizacaoGist = null;
 
@@ -1384,13 +1384,23 @@ function renderizarHistoricos() {
     const totalTaxas = DB.historicoVendas.reduce((acc, v) => acc + (v.taxa || 0), 0);
     const totalEntrouLiquido = totalEntrouBruto - totalTaxas; 
     const totalSaiu = DB.historicoGastos ? DB.historicoGastos.reduce((acc, g) => acc + g.valor, 0) : 0;
-    const caixaInvestimento = DB.historicoVendas.reduce((acc, v) => acc + (v.valorInvestimento || 0), 0);
+    const gastosReposicao = DB.historicoGastos
+        .filter(g => g.descricao.toLowerCase().includes("compra"))
+        .reduce((acc, g) => acc + g.valor, 0);
+    const caixaInvestimentoBruto = DB.historicoVendas.reduce((acc, v) => acc + (v.valorInvestimento || 0), 0);
+    const caixaInvestimentoReal = caixaInvestimentoBruto - gastosReposicao;
+    const meta = 5600;
+    const progressoMeta = Math.max(0, Math.min(100, (caixaInvestimentoReal / meta) * 100));
     const lucroLivreTotal = DB.historicoVendas.reduce((acc, v) => acc + (v.lucroLiquido || 0), 0);
 
     document.getElementById('dash-entrou').textContent = fmtDinheiro(totalEntrouLiquido); 
     document.getElementById('dash-saiu').textContent = fmtDinheiro(totalSaiu);
-    document.getElementById('dash-investimento').textContent = fmtDinheiro(caixaInvestimento);
     document.getElementById('dash-energia').textContent = fmtDinheiro(DB.energiaAcumulada?.valor ?? DB.energiaAcumulada ?? 0);
+    const elInvestimento = document.getElementById('dash-investimento');
+    elInvestimento.textContent = fmtDinheiro(caixaInvestimentoReal);
+    elInvestimento.style.color = caixaInvestimentoReal >= 0 ? 'var(--warning)' : 'var(--danger)';
+    document.getElementById('dash-meta-bar').style.width = `${progressoMeta}%`;
+    document.getElementById('dash-meta-perc').textContent = `${progressoMeta.toFixed(1)}%`;
     const elLucro = document.getElementById('dash-lucro-livre'); 
     elLucro.textContent = fmtDinheiro(lucroLivreTotal); 
     elLucro.className = lucroLivreTotal >= 0 ? 'text-success' : 'text-danger';
