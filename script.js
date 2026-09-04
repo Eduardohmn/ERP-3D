@@ -1387,7 +1387,7 @@ function renderizarHistoricos() {
     const gastosReposicao = DB.historicoGastos
         .filter(g => g.descricao.toLowerCase().includes("compra"))
         .reduce((acc, g) => acc + g.valor, 0);
-    const caixaInvestimentoBruto = DB.historicoVendas.reduce((acc, v) => acc + (v.valorInvestimento || 0), 0);
+    const caixaInvestimentoBruto = DB.historicoVendas.reduce((acc, v) => acc + (v.custoReposicao || 0) + (v.valorInvestimento || 0), 0);
     const caixaInvestimentoReal = caixaInvestimentoBruto - gastosReposicao;
     const meta = 5600;
     const progressoMeta = Math.max(0, Math.min(100, (caixaInvestimentoReal / meta) * 100));
