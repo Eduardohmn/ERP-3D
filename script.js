@@ -1405,44 +1405,8 @@ function renderizarHistoricos() {
     elLucro.textContent = fmtDinheiro(lucroLivreTotal); 
     elLucro.className = lucroLivreTotal >= 0 ? 'text-success' : 'text-danger';
 
-    const elVendas = document.getElementById('lista-historico-vendas'); 
-    elVendas.innerHTML = '';
-    [...DB.historicoVendas].reverse().forEach(v => {
-        // Formatação condicional baseada no novo tipoVenda
-        const iconeVenda = v.tipoVenda === 'Online' ? '📦 E-commerce' : '🛒 PDV';
-        const infoExtra = v.tipoVenda === 'Online' && v.rastreio ? ` | Rastreio: ${v.rastreio}` : '';
-        
-        elVendas.innerHTML += `
-        <div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--success);">
-            <div class="flex-between">
-                <strong>${v.quantidade}x ${v.nomeProduto}</strong>
-                <span class="badge">${v.data}</span>
-            </div>
-            <div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;">
-                ${iconeVenda} - ${v.plataforma} ${infoExtra}
-            </div>
-            <div style="font-size:0.85rem; color:var(--text-muted);">
-                Recebido Líquido: ${fmtDinheiro(v.precoVendaTotal - v.taxa)} (Taxas: ${fmtDinheiro(v.taxa)})
-            </div>
-            <div class="res-row destaque" style="border:none; padding:0; margin-top:0.3rem;">
-                <span>Lucro Livre da Venda:</span>
-                <strong class="text-success">${fmtDinheiro(v.lucroLiquido)}</strong>
-            </div>
-        </div>`; 
-    });
-
-    // --- (A renderização de produção e perdas contínua igual abaixo) ---
-    const elProducao = document.getElementById('lista-historico-producao'); 
-    elProducao.innerHTML = '';
-    [...DB.historicoProducao].reverse().forEach(p => { 
-        elProducao.innerHTML += `<div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--primary);"><div class="flex-between"><strong>${p.quantidade}x ${p.nomeProduto} fabricados</strong><span class="badge">${p.data}</span></div></div>`; 
-    });
-
-    const elPerdas = document.getElementById('lista-historico-perdas'); 
-    elPerdas.innerHTML = '';
-    [...DB.historicoPerdas].reverse().forEach(p => { 
-        elPerdas.innerHTML += `<div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--warning);"><div class="flex-between"><strong>${p.tipo}: ${p.pesoGasto} em ${p.filamentoNome}</strong><span class="badge">${p.data}</span></div><div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.3rem;">Motivo: ${p.motivo}</div><div class="res-row destaque" style="border:none; padding:0;"><span style="color:var(--text-muted);">Prejuízo Total:</span><strong class="text-danger">-${fmtDinheiro(p.custoTotal)}</strong></div></div>`; 
-    });
+    // Dispara a renderização do mês logo em seguida para carregar as listas
+    renderizarDetalhamentoMes();
 }
 
 function configurarFiltroMes() {
@@ -1461,72 +1425,71 @@ function configurarFiltroMes() {
 function renderizarDetalhamentoMes() {
     const inputMes = document.getElementById('filtro-mes-hist').value;
     if(!inputMes) return;
-    
     const [anoFiltro, mesFiltro] = inputMes.split('-');
-    
-    let totalBruto = 0;
-    let taxasPlataforma = 0;
-    let comprasMaterial = 0;
-    let gastosEnergia = 0;
-    let perdasDescarte = 0;
-    let gastosLogistica = 0;
+    let totalBruto = 0, taxasPlataforma = 0, lucroLivreMes = 0;
+    let comprasMaterial = 0, gastosEnergia = 0, perdasDescarte = 0, gastosLogistica = 0;
+    let itensVendidos = 0, itensProduzidos = 0;
+    let rankingProdutos = {};
 
-    // Filtra Vendas do Mês Selecionado
-    DB.historicoVendas.forEach(v => {
-        const [diaV, mesV, anoV] = v.data.split('/');
-        if (mesV === mesFiltro && anoV === anoFiltro) {
-            totalBruto += (v.precoVendaTotal || 0);
-            taxasPlataforma += (v.taxa || 0);
-        }
+    const vendasMes = DB.historicoVendas.filter(v => v.data.split('/')[1] === mesFiltro && v.data.split('/')[2] === anoFiltro);
+    const prodMes = DB.historicoProducao.filter(p => p.data.split('/')[1] === mesFiltro && p.data.split('/')[2] === anoFiltro);
+    const perdasMes = DB.historicoPerdas.filter(p => p.data.split('/')[1] === mesFiltro && p.data.split('/')[2] === anoFiltro);
+    const gastosMes = DB.historicoGastos.filter(g => g.data.split('/')[1] === mesFiltro && g.data.split('/')[2] === anoFiltro);
+
+    vendasMes.forEach(v => {
+        totalBruto += v.precoVendaTotal || 0;
+        taxasPlataforma += v.taxa || 0;
+        lucroLivreMes += v.lucroLiquido || 0;
+        itensVendidos += v.quantidade || 0;
+        rankingProdutos[v.nomeProduto] = (rankingProdutos[v.nomeProduto] || 0) + (v.quantidade || 0);
     });
 
-    // Filtra Gastos Gerais do Mês Selecionado
-    DB.historicoGastos.forEach(g => {
-        const [diaG, mesG, anoG] = g.data.split('/');
-        if (mesG === mesFiltro && anoG === anoFiltro) {
-            const desc = g.descricao.toLowerCase();
-            if (desc.includes("compra")) comprasMaterial += g.valor;
-            else if (desc.includes("energia")) gastosEnergia += g.valor;
-            else if (!desc.includes("perda")) gastosLogistica += g.valor;
-        }
+    let topProduto = "Nenhum";
+    let maxQtd = 0;
+    for (const [nome, qtd] of Object.entries(rankingProdutos)) {
+        if (qtd > maxQtd) { topProduto = nome; maxQtd = qtd; }
+    }
+
+    prodMes.forEach(p => itensProduzidos += p.quantidade || 0);
+    gastosMes.forEach(g => {
+        const desc = g.descricao.toLowerCase();
+        if (desc.includes("compra")) comprasMaterial += g.valor || 0;
+        else if (desc.includes("energia")) gastosEnergia += g.valor || 0;
+        else if (!desc.includes("perda")) gastosLogistica += g.valor || 0;
     });
+    perdasMes.forEach(p => perdasDescarte += p.custoTotal || 0);
 
-    DB.historicoPerdas.forEach(p => {
-        const [diaP, mesP, anoP] = p.data.split('/');
-        if (mesP === mesFiltro && anoP === anoFiltro) {
-            perdasDescarte += (p.custoTotal || 0);
-        }
-    });
-
-    const fluxoCaixaMensal = totalBruto - (taxasPlataforma + comprasMaterial + gastosEnergia + gastosLogistica);
-
+    const fluxoCaixaMensal = (totalBruto - taxasPlataforma) - (comprasMaterial + gastosEnergia + gastosLogistica);
     const painel = document.getElementById('painel-detalhamento-mes');
     painel.innerHTML = `
-        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--border);">
-            <div style="font-size: 0.8rem; color: var(--text-muted);">Total de Vendas (Bruto)</div>
-            <strong style="font-size: 1.2rem; color: #fff;">${fmtDinheiro(totalBruto)}</strong>
-        </div>
-        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--danger);">
-            <div style="font-size: 0.8rem; color: var(--danger);">Taxas (Shopee/Cartão)</div>
-            <strong style="font-size: 1.2rem; color: var(--danger);">-${fmtDinheiro(taxasPlataforma)}</strong>
-        </div>
-        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--warning);">
-            <div style="font-size: 0.8rem; color: var(--warning);">Compras de Insumos/Material</div>
-            <strong style="font-size: 1.2rem; color: var(--warning);">-${fmtDinheiro(comprasMaterial)}</strong>
-        </div>
-        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--border);">
-            <div style="font-size: 0.8rem; color: #ffeb3b;">Energia Elétrica (Paga)</div>
-            <strong style="font-size: 1.2rem; color: #ffeb3b;">-${fmtDinheiro(gastosEnergia)}</strong>
-        </div>
-        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px dashed var(--danger);">
-            <div style="font-size: 0.8rem; color: var(--text-muted);">Desperdício (Peças Falhas)</div>
-            <strong style="font-size: 1.2rem; color: var(--danger);">-${fmtDinheiro(perdasDescarte)}</strong>
-        </div>
-        <div style="background: var(--primary); padding: 1rem; border-radius: 4px; grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-size: 0.9rem; color: #fff; font-weight: bold;">Fluxo de Caixa do Mês:</div>
-            <strong style="font-size: 1.4rem; color: #fff;">${fmtDinheiro(fluxoCaixaMensal)}</strong>
-        </div>
+        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--border);"><div style="font-size: 0.8rem; color: var(--text-muted);">Vendas (Faturamento Bruto)</div><strong style="font-size: 1.2rem; color: #fff;">${fmtDinheiro(totalBruto)}</strong></div>
+        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--success);"><div style="font-size: 0.8rem; color: var(--success);">Lucro Livre Mensal</div><strong style="font-size: 1.2rem; color: var(--success);">${fmtDinheiro(lucroLivreMes)}</strong></div>
+        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--primary);"><div style="font-size: 0.8rem; color: var(--primary);">Volume de Vendas</div><strong style="font-size: 1.2rem; color: #fff;">${itensVendidos} peças</strong><div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">🏆 Campeão: ${topProduto}</div></div>
+        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--border);"><div style="font-size: 0.8rem; color: var(--text-muted);">Produção da Máquina</div><strong style="font-size: 1.2rem; color: #fff;">${itensProduzidos} peças</strong></div>
+        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--warning);"><div style="font-size: 0.8rem; color: var(--warning);">Compras de Insumos/Estoque</div><strong style="font-size: 1.2rem; color: var(--warning);">-${fmtDinheiro(comprasMaterial)}</strong></div>
+        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px dashed var(--danger);"><div style="font-size: 0.8rem; color: var(--danger);">Custos Fixos (Taxas + Luz)</div><strong style="font-size: 1.2rem; color: var(--danger);">-${fmtDinheiro(taxasPlataforma + gastosEnergia)}</strong></div>
+        <div style="background: var(--primary); padding: 1rem; border-radius: 4px; grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center;"><div style="font-size: 0.9rem; color: #fff; font-weight: bold;">Fluxo de Caixa do Mês (Entradas - Saídas reais):</div><strong style="font-size: 1.4rem; color: #fff;">${fmtDinheiro(fluxoCaixaMensal)}</strong></div>
     `;
+
+    const elVendas = document.getElementById('lista-historico-vendas');
+    elVendas.innerHTML = vendasMes.length === 0 ? '<p class="ajuda">Nenhuma venda neste mês.</p>' : '';
+    [...vendasMes].reverse().forEach(v => {
+        const iconeVenda = v.tipoVenda === 'Online' ? '📦 E-commerce' : '🛒 PDV';
+        const infoExtra = v.tipoVenda === 'Online' && v.rastreio ? ` | Rastreio: ${v.rastreio}` : '';
+        elVendas.innerHTML += `<div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--success);"><div class="flex-between"><strong>${v.quantidade}x ${v.nomeProduto}</strong><span class="badge">${v.data}</span></div><div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.5rem;">${iconeVenda} - ${v.plataforma} ${infoExtra}</div><div style="font-size:0.85rem; color:var(--text-muted);">Recebido Líquido: ${fmtDinheiro(v.precoVendaTotal - (v.taxa || 0))} (Taxas: ${fmtDinheiro(v.taxa || 0)})</div><div class="res-row destaque" style="border:none; padding:0; margin-top:0.3rem;"><span>Lucro Livre da Venda:</span><strong class="text-success">${fmtDinheiro(v.lucroLiquido || 0)}</strong></div></div>`;
+    });
+
+    const elProducao = document.getElementById('lista-historico-producao');
+    elProducao.innerHTML = prodMes.length === 0 ? '<p class="ajuda">Nenhuma produção neste mês.</p>' : '';
+    [...prodMes].reverse().forEach(p => {
+        elProducao.innerHTML += `<div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--primary);"><div class="flex-between"><strong>${p.quantidade}x ${p.nomeProduto} fabricados</strong><span class="badge">${p.data}</span></div></div>`;
+    });
+
+    const elPerdas = document.getElementById('lista-historico-perdas');
+    elPerdas.innerHTML = perdasMes.length === 0 ? '<p class="ajuda">Nenhum descarte neste mês.</p>' : '';
+    [...perdasMes].reverse().forEach(p => {
+        elPerdas.innerHTML += `<div class="card card-alt" style="margin-bottom: 0; border-left: 4px solid var(--warning);"><div class="flex-between"><strong>${p.tipo}: ${p.pesoGasto} em ${p.filamentoNome}</strong><span class="badge">${p.data}</span></div><div style="font-size:0.85rem; color:var(--text-muted); margin-top:0.3rem;">Motivo: ${p.motivo}</div><div class="res-row destaque" style="border:none; padding:0;"><span style="color:var(--text-muted);">Prejuízo Total:</span><strong class="text-danger">-${fmtDinheiro(p.custoTotal || 0)}</strong></div></div>`;
+    });
 }
 
 // Chame estas funções no final do seu `renderizarHistoricos()` ou no `iniciarApp()`:
