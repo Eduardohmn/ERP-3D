@@ -1085,6 +1085,19 @@ function setModoVenda(modo) {
 }
 
 // 3. Renderização do Estoque nos dois Selects
+async function zerarEstoquePronto(id) {
+    if (confirm("⚠️ Isso vai ZERAR o estoque deste produto sem registrar venda/lucro. Use apenas em caso de erro de sincronização ou recontagem. Confirma?")) {
+        const prod = DB.estoqueProntos.find(p => p.id === id);
+        if (prod) {
+            prod.quantidade = 0;
+            prod.lastModified = Date.now();
+            await salvarDB();
+            renderizarAbaVendas();
+            atualizarSelectProducao();
+        }
+    }
+}
+
 function renderizarAbaVendas() {
     const elLista = document.getElementById('lista-estoque-prontos'); 
     elLista.innerHTML = '';
@@ -1094,7 +1107,17 @@ function renderizarAbaVendas() {
     });
 
     DB.estoqueProntos.filter(p => p.quantidade > 0).forEach(p => { 
-        elLista.innerHTML += `<div class="item-card" style="border-left: 4px solid var(--primary);"><div class="item-title">${p.nome}</div><div class="item-details"><span style="font-weight:bold;">Estoque: ${p.quantidade} un.</span><span>Custo Médio Fab.: ${fmtDinheiro(p.custoUnitario)}</span></div></div>`; 
+        elLista.innerHTML += `
+        <div class="item-card" style="border-left: 4px solid var(--primary);">
+            <div class="item-title">
+                ${p.nome}
+                <button class="btn-danger btn-small" onclick="zerarEstoquePronto(${p.id})" title="Zerar estoque manual" style="padding: 0.2rem 0.5rem; margin-left: 0.5rem;">🗑️ Zerar</button>
+            </div>
+            <div class="item-details">
+                <span style="font-weight:bold;">Estoque: ${p.quantidade} un.</span>
+                <span>Custo Médio Fab.: ${fmtDinheiro(p.custoUnitario)}</span>
+            </div>
+        </div>`; 
         
         const optText = `${p.nome} (Disp: ${p.quantidade})`;
         document.querySelectorAll('.venda-produto-select').forEach(select => {
@@ -1444,13 +1467,49 @@ function renderizarDetalhamentoMes() {
     const fluxoCaixaMensal = (totalBruto - taxasPlataforma) - (comprasMaterial + gastosEnergia + gastosLogistica);
     const painel = document.getElementById('painel-detalhamento-mes');
     painel.innerHTML = `
-        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--border);"><div style="font-size: 0.8rem; color: var(--text-muted);">Vendas (Faturamento Bruto)</div><strong style="font-size: 1.2rem; color: #fff;">${fmtDinheiro(totalBruto)}</strong></div>
-        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--success);"><div style="font-size: 0.8rem; color: var(--success);">Lucro Livre Mensal</div><strong style="font-size: 1.2rem; color: var(--success);">${fmtDinheiro(lucroLivreMes)}</strong></div>
-        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--primary);"><div style="font-size: 0.8rem; color: var(--primary);">Volume de Vendas</div><strong style="font-size: 1.2rem; color: #fff;">${itensVendidos} peças</strong><div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 5px;">🏆 Campeão: ${topProduto}</div></div>
-        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--border);"><div style="font-size: 0.8rem; color: var(--text-muted);">Produção da Máquina</div><strong style="font-size: 1.2rem; color: #fff;">${itensProduzidos} peças</strong></div>
-        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px solid var(--warning);"><div style="font-size: 0.8rem; color: var(--warning);">Compras de Insumos/Estoque</div><strong style="font-size: 1.2rem; color: var(--warning);">-${fmtDinheiro(comprasMaterial)}</strong></div>
-        <div style="background: var(--bg-input); padding: 1rem; border-radius: 4px; border: 1px dashed var(--danger);"><div style="font-size: 0.8rem; color: var(--danger);">Custos Fixos (Taxas + Luz)</div><strong style="font-size: 1.2rem; color: var(--danger);">-${fmtDinheiro(taxasPlataforma + gastosEnergia)}</strong></div>
-        <div style="background: var(--primary); padding: 1rem; border-radius: 4px; grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center;"><div style="font-size: 0.9rem; color: #fff; font-weight: bold;">Fluxo de Caixa do Mês (Entradas - Saídas reais):</div><strong style="font-size: 1.4rem; color: #fff;">${fmtDinheiro(fluxoCaixaMensal)}</strong></div>
+        <div style="background: var(--bg-input); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase;">💰 Faturamento Bruto</div>
+            <strong style="font-size: 1.4rem; color: #fff;">${fmtDinheiro(totalBruto)}</strong>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">Vendas totais geradas</div>
+        </div>
+        
+        <div style="background: var(--bg-input); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--success); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: var(--success); font-weight: bold; text-transform: uppercase;">✨ Lucro Livre (Vendas)</div>
+            <strong style="font-size: 1.4rem; color: var(--success);">${fmtDinheiro(lucroLivreMes)}</strong>
+            <div style="font-size: 0.8rem; color: var(--success); opacity: 0.8; margin-top: 5px;">Seu lucro real no mês</div>
+        </div>
+        
+        <div style="background: var(--bg-input); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--primary); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: var(--primary); font-weight: bold; text-transform: uppercase;">📦 Volume de Vendas</div>
+            <strong style="font-size: 1.4rem; color: #fff;">${itensVendidos} peças</strong>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">🏆 Mais vendido: <strong>${topProduto}</strong></div>
+        </div>
+        
+        <div style="background: var(--bg-input); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: bold; text-transform: uppercase;">⚙️ Produção Física</div>
+            <strong style="font-size: 1.4rem; color: #fff;">${itensProduzidos} peças</strong>
+            <div style="font-size: 0.8rem; color: var(--warning); margin-top: 5px;">Perdas: ${fmtDinheiro(perdasDescarte)}</div>
+        </div>
+        
+        <div style="background: var(--bg-input); padding: 1.2rem; border-radius: 8px; border: 1px dashed var(--warning); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: var(--warning); font-weight: bold; text-transform: uppercase;">🛒 Investimento Estoque</div>
+            <strong style="font-size: 1.4rem; color: var(--warning);">-${fmtDinheiro(comprasMaterial)}</strong>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">Filamentos e Insumos</div>
+        </div>
+        
+        <div style="background: var(--bg-input); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--danger); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: var(--danger); font-weight: bold; text-transform: uppercase;">💸 Custos & Taxas</div>
+            <strong style="font-size: 1.4rem; color: var(--danger);">-${fmtDinheiro(taxasPlataforma + gastosEnergia)}</strong>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">Taxas: ${fmtDinheiro(taxasPlataforma)} | Luz: ${fmtDinheiro(gastosEnergia)}</div>
+        </div>
+        
+        <div style="background: linear-gradient(135deg, var(--primary) 0%, #1e40af 100%); padding: 1.5rem; border-radius: 8px; grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 6px 12px rgba(0,0,0,0.2);">
+            <div style="display: flex; flex-direction: column;">
+                <span style="font-size: 0.95rem; color: #e0e7ff; font-weight: bold; text-transform: uppercase;">Fluxo de Caixa Real (Entradas - Saídas)</span>
+                <span style="font-size: 0.85rem; color: #93c5fd; margin-top: 3px;">Dinheiro que efetivamente sobrou no bolso este mês</span>
+            </div>
+            <strong style="font-size: 1.8rem; color: #fff;">${fmtDinheiro(fluxoCaixaMensal)}</strong>
+        </div>
     `;
 
     const elVendas = document.getElementById('lista-historico-vendas');
