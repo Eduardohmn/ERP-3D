@@ -3,7 +3,6 @@ const fmtDinheiro = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', c
 const fmtNum = (v) => v.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 // --- ESTADO DO BANCO DE DADOS ---
-let syncTimeLocal = Date.now();
 let DB = {
     filamentos: [], extras: [], receitas: [],
     estoqueProntos: [], historicoProducao: [], historicoVendas: [], historicoPerdas: [],
@@ -19,7 +18,7 @@ let GIST_ID = localStorage.getItem('gist_id');
 // =======================================================================
 // 🔄 SISTEMA DE VERIFICAÇÃO DE VERSÃO (ANTI-CACHE E CONFLITOS)
 // =======================================================================
-const VERSAO_ATUAL = "1.0.13"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
+const VERSAO_ATUAL = "1.0.14"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
 const INTERVALO_VERIFICACAO = 3 * 60 * 1000; // 3 minutos (em milissegundos)
 let ultimaAtualizacaoGist = null;
 
@@ -74,7 +73,6 @@ async function iniciarNuvem() {
         if (content && content !== "{}") {
             const cloudDB = JSON.parse(content);
             DB = mesclarBancosDeDados(cloudDB, DB);
-            syncTimeLocal = Date.now();
         }
     } catch (error) { 
         console.error("Erro nuvem:", error); 
@@ -111,16 +109,6 @@ function mesclarBancosDeDados(dbNuvem, dbLocal) {
         itensLocais.forEach(itemLocal => {
             if (mapa.has(itemLocal.id)) {
                 let itemNuvem = mapa.get(itemLocal.id);
-                if (categoria === 'estoqueProntos' && itemNuvem.quantidade !== undefined) {
-                    itemLocal.quantidade = Math.min(itemLocal.quantidade, itemNuvem.quantidade);
-                }
-                if (categoria === 'filamentos' && itemNuvem.pesoRestante !== undefined) {
-                    itemLocal.pesoRestante = Math.min(itemLocal.pesoRestante, itemNuvem.pesoRestante);
-                }
-                if (categoria === 'extras' && itemNuvem.qtdRestante !== undefined) {
-                    itemLocal.qtdRestante = Math.min(itemLocal.qtdRestante, itemNuvem.qtdRestante);
-                }
-
                 if (itemLocal.lastModified > itemNuvem.lastModified) {
                     mapa.set(itemLocal.id, itemLocal);
                 }
@@ -150,7 +138,6 @@ async function salvarDB(forcarSubstituicao = false) {
             DB = mesclarBancosDeDados(dbNuvem, DB);
         }
 
-        syncTimeLocal = Date.now(); 
         localStorage.setItem('db_backup', JSON.stringify(DB));
 
         const respostaPatch = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
@@ -1106,18 +1093,16 @@ function renderizarAbaVendas() {
         select.innerHTML = '<option value="">Selecione no estoque pronto...</option>';
     });
 
-    DB.estoqueProntos.forEach(p => { 
+    DB.estoqueProntos.filter(p => p.quantidade > 0).forEach(p => { 
         elLista.innerHTML += `<div class="item-card" style="border-left: 4px solid var(--primary);"><div class="item-title">${p.nome}</div><div class="item-details"><span style="font-weight:bold;">Estoque: ${p.quantidade} un.</span><span>Custo Médio Fab.: ${fmtDinheiro(p.custoUnitario)}</span></div></div>`; 
         
-        if (p.quantidade > 0) { 
-            const optText = `${p.nome} (Disp: ${p.quantidade})`;
-            document.querySelectorAll('.venda-produto-select').forEach(select => {
-                const opt = document.createElement('option');
-                opt.value = p.id;
-                opt.textContent = optText;
-                select.appendChild(opt);
-            });
-        } 
+        const optText = `${p.nome} (Disp: ${p.quantidade})`;
+        document.querySelectorAll('.venda-produto-select').forEach(select => {
+            const opt = document.createElement('option');
+            opt.value = p.id;
+            opt.textContent = optText;
+            select.appendChild(opt);
+        });
     });
 }
 
@@ -1321,9 +1306,6 @@ async function processarVenda(tipoVenda, formValues) {
     
     produto.quantidade -= qtd; 
     produto.lastModified = Date.now();
-    if (produto.quantidade === 0) { 
-        DB.estoqueProntos = DB.estoqueProntos.filter(p => p.id !== prodId); 
-    }
 
     // Estrutura rica para o banco de dados
     DB.historicoVendas.push({ 
@@ -1534,7 +1516,7 @@ function renderizarVitrine() {
 
     let contadorVisiveis = 0;
 
-    const receitasOrdenadas = [...DB.receitas].sort((a, b) => {
+    const receitasOrdenadas = [...DB.receitas].filter(r => !r.deleted).sort((a, b) => {
         return (b.exibirVitrine === true ? 1 : 0) - (a.exibirVitrine === true ? 1 : 0);
     });
 
