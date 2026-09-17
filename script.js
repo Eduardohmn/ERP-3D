@@ -11,72 +11,25 @@ let DB = {
 let simulacaoAtual = null; 
 let editandoReceitaId = null;
 
-// --- INTEGRAÇÃO COM GITHUB ---
-let GITHUB_TOKEN = localStorage.getItem('github_token');
-let GIST_ID = localStorage.getItem('gist_id');
-
 // =======================================================================
 // 🔄 SISTEMA DE VERIFICAÇÃO DE VERSÃO (ANTI-CACHE E CONFLITOS)
 // =======================================================================
-const VERSAO_ATUAL = "1.0.14"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
-const INTERVALO_VERIFICACAO = 3 * 60 * 1000; // 3 minutos (em milissegundos)
+const VERSAO_ATUAL = "1.0.15"; // <-- Mude isso aqui e no versao.json quando atualizar o sistema
 let ultimaAtualizacaoGist = null;
 
-async function verificarAtualizacao() {
-    if (!GITHUB_TOKEN || !GIST_ID) return;
-    try {
-        const resposta = await fetch(`https://api.github.com/gists/${GIST_ID}`, { 
-            headers: { 'Authorization': `token ${GITHUB_TOKEN}` } 
-        });
-        if (!resposta.ok) return;
-
-        const dadosNuvem = await resposta.json();
-        const dataAtualizacao = dadosNuvem.updated_at;
-
-        if (ultimaAtualizacaoGist && dataAtualizacao !== ultimaAtualizacaoGist) {
-            alert("⚠️ DADOS ATUALIZADOS NA NUVEM!\n\nAlguém da equipe salvou dados novos. A página será recarregada para evitar conflitos de sobrescrita.");
-            window.location.reload(true);
-        }
-        ultimaAtualizacaoGist = dataAtualizacao;
-    } catch (erro) {
-        console.log("Falha ao checar atualizações da nuvem.", erro);
-    }
-}
-
-setInterval(verificarAtualizacao, INTERVALO_VERIFICACAO);
-setTimeout(verificarAtualizacao, 5000);
-// =======================================================================
-
 async function iniciarNuvem() {
-    if (!GITHUB_TOKEN || !GIST_ID) {
-        const inputDados = prompt("☁️ Cole as chaves (Token + ID Gist):");
-        if (inputDados) {
-            const tokenMatch = inputDados.match(/(ghp_[a-zA-Z0-9]+)/);
-            if (tokenMatch) {
-                GITHUB_TOKEN = tokenMatch[1]; 
-                GIST_ID = inputDados.replace(GITHUB_TOKEN, '').replace(/[^a-zA-Z0-9]/g, '').trim();
-                localStorage.setItem('github_token', GITHUB_TOKEN); 
-                localStorage.setItem('gist_id', GIST_ID);
-            } else { 
-                alert("Token inválido."); 
-                return; 
-            }
-        } else { 
-            return; 
-        }
-    }
     try {
-        const response = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Authorization': `token ${GITHUB_TOKEN}` } });
-        if (!response.ok) throw new Error("Credenciais inválidas.");
-        const data = await response.json(); 
-        const content = data.files['database.json'].content;
-        if (content && content !== "{}") {
+        const response = await fetch('./api.php');
+        if (!response.ok) throw new Error("Erro ao acessar a API PHP.");
+        
+        const content = await response.text();
+        if (content && content !== "{}" && content.trim() !== "") {
             const cloudDB = JSON.parse(content);
             DB = mesclarBancosDeDados(cloudDB, DB);
         }
     } catch (error) { 
-        console.error("Erro nuvem:", error); 
-        alert("☁️ Falha ao carregar os dados da nuvem. O sistema operará com a versão local.");
+        console.error("Erro no SQLite/PHP:", error); 
+        alert("Falha ao carregar os dados do banco. O sistema operará com a versão local.");
     }
 }
 
@@ -124,31 +77,30 @@ function mesclarBancosDeDados(dbNuvem, dbLocal) {
 }
 
 async function salvarDB(forcarSubstituicao = false) {
-    if (!GITHUB_TOKEN || !GIST_ID) { 
-        localStorage.setItem('db_backup', JSON.stringify(DB)); 
-        return; 
-    }
     try {
         if (!forcarSubstituicao) {
-            const respostaGet = await fetch(`https://api.github.com/gists/${GIST_ID}`, { headers: { 'Authorization': `token ${GITHUB_TOKEN}` } });
-            if (!respostaGet.ok) throw new Error('Falha ao obter Gist remoto.');
-            const dadosGist = await respostaGet.json();
-            const dbNuvem = (dadosGist && dadosGist.files && dadosGist.files['database.json'] && dadosGist.files['database.json'].content) ? JSON.parse(dadosGist.files['database.json'].content) : {};
-
-            DB = mesclarBancosDeDados(dbNuvem, DB);
+            const respostaGet = await fetch('./api.php');
+            if (respostaGet.ok) {
+                const text = await respostaGet.text();
+                const dbNuvem = text && text !== "{}" ? JSON.parse(text) : {};
+                DB = mesclarBancosDeDados(dbNuvem, DB);
+            }
         }
 
+        // Salva localmente por segurança
         localStorage.setItem('db_backup', JSON.stringify(DB));
 
-        const respostaPatch = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-            method: 'PATCH',
-            headers: { 'Authorization': `token ${GITHUB_TOKEN}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ files: { 'database.json': { content: JSON.stringify(DB) } } })
+        // Envia para o PHP gravar no SQLite
+        const respostaPost = await fetch('./api.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(DB)
         });
 
-        if (!respostaPatch.ok) throw new Error('Erro ao salvar no GitHub.');
-        const dadosGistAtualizado = await respostaPatch.json();
-        ultimaAtualizacaoGist = dadosGistAtualizado.updated_at;
+        if (!respostaPost.ok) throw new Error('Erro ao salvar no PHP.');
+        
+        // Atualiza a interface
+        ultimaAtualizacaoGist = Date.now(); // Variável antiga reaproveitada para controle
 
         atualizarSelectsDinamicos(); 
         atualizarSelectProducao(); 
@@ -159,7 +111,7 @@ async function salvarDB(forcarSubstituicao = false) {
         renderizarVitrine();
     } catch (e) { 
         console.error('Falha sync:', e); 
-        alert("❌ Erro ao salvar na nuvem! Verifique sua conexão ou token do GitHub. Seus dados foram salvos apenas localmente.");
+        alert("❌ Erro ao salvar no banco SQLite! Seus dados foram salvos apenas localmente.");
     }
 }
 
@@ -315,7 +267,11 @@ function renderizarInventario() {
         <div class="item-card">
             <div class="item-title">
                 <span style="color:var(--primary)">[#${shortId}]</span> ${f.nome}
-                <div><button class="btn-small" onclick="editarFil(${f.id})" title="Editar Peso/Local">✏️</button><button class="btn-danger btn-small" onclick="apagarFil(${f.id})">X</button></div>
+                <div>
+                    <button class="btn-small btn-success" onclick="reporFil(${f.id})" title="Comprar Mais (Adicionar Estoque)" style="margin-right:4px;">➕ Repor</button>
+                    <button class="btn-small" onclick="editarFil(${f.id})" title="Editar Peso Manual">✏️</button>
+                    <button class="btn-danger btn-small" onclick="apagarFil(${f.id})" title="Apagar Lote">X</button>
+                </div>
             </div>
             <div class="item-details"><span>📍 Local: <strong>${f.localizacao || 'Prateleira'}</strong></span><span>Custo: ${fmtDinheiro(f.custoPorGrama)}/g</span><span style="font-weight:bold;">Resta: ${fmtNum(f.pesoRestante)}g</span></div>
             <div class="stock-bar-bg"><div class="stock-bar-fill ${corEstoque}" style="width: ${percEstoque}%"></div></div>
@@ -333,12 +289,74 @@ function renderizarInventario() {
         const percROI = x.precoTotal > 0 ? ((recuperado / x.precoTotal) * 100).toFixed(0) : '0';
         elExt.innerHTML += `
         <div class="item-card">
-            <div class="item-title">${x.nome}<div><button class="btn-small" onclick="editarExt(${x.id})">✏️</button><button class="btn-danger btn-small" onclick="apagarExt(${x.id})">X</button></div></div>
+            <div class="item-title">${x.nome}
+                <div>
+                    <button class="btn-small btn-success" onclick="reporExt(${x.id})" title="Comprar Mais (Adicionar Estoque)" style="margin-right:4px;">➕ Repor</button>
+                    <button class="btn-small" onclick="editarExt(${x.id})" title="Editar Quantidade Manual">✏️</button>
+                    <button class="btn-danger btn-small" onclick="apagarExt(${x.id})" title="Apagar Insumo">X</button>
+                </div>
+            </div>
             <div class="item-details"><span>Custo: ${fmtDinheiro(x.custoUnitario)}/${sigla}</span><span style="font-weight:bold;">Resta: ${fmtNum(x.qtdRestante)}</span></div>
             <div class="stock-bar-bg"><div class="stock-bar-fill ${corEstoque}" style="width: ${percEstoque}%"></div></div>
             <div style="margin-top: 1rem; font-size: 0.85rem; padding-top: 0.5rem; border-top: 1px dashed var(--border);"><div class="flex-between"><span style="color: var(--text-muted);">Retorno (ROI): <strong>${fmtDinheiro(recuperado)}</strong></span><span class="badge" style="background: ${isPago ? 'var(--success)' : 'var(--danger)'}; color: ${isPago ? '#000' : '#fff'}; font-size: 0.7rem;">${isPago ? '🟢 SE PAGOU' : '🔴 ' + percROI + '%'}</span></div></div>
         </div>`;
     });
+}
+
+async function reporFil(id) {
+    const fil = DB.filamentos.find(f => f.id === id);
+    if (!fil) return;
+    
+    const novoPeso = prompt(`🛒 Comprar mais: ${fil.nome}\nQuantos gramas (g) você comprou para juntar a este lote?`);
+    if (!novoPeso || isNaN(parseFloat(novoPeso.replace(',', '.'))) || parseFloat(novoPeso.replace(',', '.')) <= 0) return;
+    
+    const precoPago = prompt(`💸 Preço Pago:\nQuanto custou essa nova compra de ${novoPeso}g?`);
+    if (!precoPago || isNaN(parseFloat(precoPago.replace(',', '.'))) || parseFloat(precoPago.replace(',', '.')) <= 0) return;
+
+    const qtdAdicionada = parseFloat(novoPeso.replace(',', '.'));
+    const valorAdicionado = parseFloat(precoPago.replace(',', '.'));
+
+    const valorEstoqueAnterior = fil.pesoRestante * fil.custoPorGrama;
+    fil.pesoRestante += qtdAdicionada;
+    fil.pesoInicial += qtdAdicionada;
+    fil.precoTotal += valorAdicionado;
+    
+    fil.custoPorGrama = (valorEstoqueAnterior + valorAdicionado) / fil.pesoRestante;
+    fil.lastModified = Date.now();
+    
+    DB.historicoGastos.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Reposição: Filamento ${fil.nome}`, valor: valorAdicionado });
+
+    await salvarDB();
+    renderizarInventario();
+    atualizarSelectsDinamicos();
+}
+
+async function reporExt(id) {
+    const ext = DB.extras.find(e => e.id === id);
+    if (!ext) return;
+    
+    const novaQtd = prompt(`🛒 Comprar mais: ${ext.nome}\nQuantas unidades/medidas você comprou para adicionar ao estoque atual?`);
+    if (!novaQtd || isNaN(parseFloat(novaQtd.replace(',', '.'))) || parseFloat(novaQtd.replace(',', '.')) <= 0) return;
+    
+    const precoPago = prompt(`💸 Preço Pago:\nQuanto custou essa nova compra de ${novaQtd}?`);
+    if (!precoPago || isNaN(parseFloat(precoPago.replace(',', '.'))) || parseFloat(precoPago.replace(',', '.')) <= 0) return;
+
+    const qtdAdicionada = parseFloat(novaQtd.replace(',', '.'));
+    const valorAdicionado = parseFloat(precoPago.replace(',', '.'));
+
+    const valorEstoqueAnterior = ext.qtdRestante * ext.custoUnitario;
+    ext.qtdRestante += qtdAdicionada;
+    ext.qtdInicial += qtdAdicionada;
+    ext.precoTotal += valorAdicionado;
+    
+    ext.custoUnitario = (valorEstoqueAnterior + valorAdicionado) / ext.qtdRestante;
+    ext.lastModified = Date.now();
+    
+    DB.historicoGastos.push({ id: Date.now(), lastModified: Date.now(), data: new Date().toLocaleDateString('pt-BR'), descricao: `Reposição: Insumo ${ext.nome}`, valor: valorAdicionado });
+
+    await salvarDB();
+    renderizarInventario();
+    atualizarSelectsDinamicos();
 }
 
 async function editarFil(id) {
@@ -830,12 +848,43 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
         }
     }
     
+    let extrasParaBaixa = [];
     if (receita.extrasUsados && Array.isArray(receita.extrasUsados)) {
-        for (let eUsado of receita.extrasUsados) {
-            const ext = DB.extras.find(ex => ex.id === eUsado.id);
-            if (!ext || ext.qtdRestante < (eUsado.qtd * fatorGastoInsumo)) { 
-                alert(`Falta o insumo: ${ext ? ext.nome : 'Desconhecido'}`); 
-                return; 
+        extrasParaBaixa = JSON.parse(JSON.stringify(receita.extrasUsados));
+        
+        for (let i = 0; i < extrasParaBaixa.length; i++) {
+            let eUsado = extrasParaBaixa[i];
+            const qtdNecessaria = eUsado.qtd * fatorGastoInsumo;
+            let ext = DB.extras.find(ex => ex.id === eUsado.id);
+            
+            if (!ext || ext.qtdRestante < qtdNecessaria) { 
+                const nomeExt = ext ? ext.nome : 'Desconhecido';
+                const disp = ext ? ext.qtdRestante : 0;
+                
+                if (!confirm(`⚠️ Falta o insumo: ${nomeExt}\nNecessário: ${fmtNum(qtdNecessaria)} | Disponível: ${fmtNum(disp)}\n\nDeseja completar/substituir usando outro insumo do estoque?`)) {
+                    alert("Produção cancelada por falta de insumo.");
+                    return; 
+                }
+                
+                const disponiveis = DB.extras.filter(x => !x.deleted && x.qtdRestante >= qtdNecessaria);
+                if (disponiveis.length === 0) {
+                    alert("Não há nenhum outro insumo no estoque com quantidade suficiente para substituir.");
+                    return;
+                }
+                
+                let msg = "Digite o número (ID) correspondente para usar no lugar:\n\n";
+                disponiveis.forEach(d => msg += `[ ${d.id} ] - ${d.nome} (Estoque: ${fmtNum(d.qtdRestante)})\n`);
+                
+                const idSubstituto = prompt(msg);
+                const extSubstituto = disponiveis.find(d => d.id == idSubstituto);
+                
+                if (!extSubstituto) {
+                    alert("Seleção inválida ou cancelada.");
+                    return;
+                }
+                
+                // Substitui para esta produção
+                eUsado.id = extSubstituto.id;
             }
         }
     }
@@ -851,8 +900,8 @@ document.getElementById('form-producao').addEventListener('submit', async (e) =>
         });
     }
     
-    if (receita.extrasUsados && Array.isArray(receita.extrasUsados)) { 
-        receita.extrasUsados.forEach(eUsado => { 
+    if (extrasParaBaixa.length > 0) { 
+        extrasParaBaixa.forEach(eUsado => { 
             const ext = DB.extras.find(ex => ex.id === eUsado.id); 
             if (ext) { 
                 ext.qtdRestante -= (eUsado.qtd * fatorGastoInsumo); 
@@ -1434,6 +1483,7 @@ function renderizarDetalhamentoMes() {
     let totalBruto = 0, taxasPlataforma = 0, lucroLivreMes = 0;
     let comprasMaterial = 0, gastosEnergia = 0, perdasDescarte = 0, gastosLogistica = 0;
     let itensVendidos = 0, itensProduzidos = 0;
+    let fundoManutencao = 0;
     let rankingProdutos = {};
 
     const vendasMes = DB.historicoVendas.filter(v => v.data.split('/')[1] === mesFiltro && v.data.split('/')[2] === anoFiltro);
@@ -1447,6 +1497,19 @@ function renderizarDetalhamentoMes() {
         lucroLivreMes += v.lucroLiquido || 0;
         itensVendidos += v.quantidade || 0;
         rankingProdutos[v.nomeProduto] = (rankingProdutos[v.nomeProduto] || 0) + (v.quantidade || 0);
+        
+        // Estimativa do Caixa de Manutenção da Máquina (1% do material+luz da peça vendida)
+        const rec = DB.receitas.find(r => r.nome === v.nomeProduto);
+        if (rec && rec.params) {
+            const rende = rec.rende || 1;
+            const cEne = (rec.params.h + (rec.params.m/60)) * rec.params.kw * rec.params.precoKwh;
+            let cFil = 0;
+            if (rec.filamentosUsados) {
+                cFil = rec.filamentosUsados.reduce((acc, f) => acc + (f.peso * f.custoRef), 0);
+            }
+            const manutUnidade = ((cEne + cFil) * 0.01) / rende;
+            fundoManutencao += (manutUnidade * v.quantidade);
+        }
     });
 
     let topProduto = "Nenhum";
@@ -1458,7 +1521,7 @@ function renderizarDetalhamentoMes() {
     prodMes.forEach(p => itensProduzidos += p.quantidade || 0);
     gastosMes.forEach(g => {
         const desc = g.descricao.toLowerCase();
-        if (desc.includes("compra")) comprasMaterial += g.valor || 0;
+        if (desc.includes("compra") || desc.includes("reposição")) comprasMaterial += g.valor || 0;
         else if (desc.includes("energia")) gastosEnergia += g.valor || 0;
         else if (!desc.includes("perda")) gastosLogistica += g.valor || 0;
     });
@@ -1477,6 +1540,12 @@ function renderizarDetalhamentoMes() {
             <div style="font-size: 0.85rem; color: var(--success); font-weight: bold; text-transform: uppercase;">✨ Lucro Livre (Vendas)</div>
             <strong style="font-size: 1.4rem; color: var(--success);">${fmtDinheiro(lucroLivreMes)}</strong>
             <div style="font-size: 0.8rem; color: var(--success); opacity: 0.8; margin-top: 5px;">Seu lucro real no mês</div>
+        </div>
+        
+        <div style="background: var(--bg-input); padding: 1.2rem; border-radius: 8px; border: 1px dashed #60a5fa; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <div style="font-size: 0.85rem; color: #60a5fa; font-weight: bold; text-transform: uppercase;">🔧 Fundo de Manutenção</div>
+            <strong style="font-size: 1.4rem; color: #60a5fa;">${fmtDinheiro(fundoManutencao)}</strong>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 5px;">1% separado da produção vendida</div>
         </div>
         
         <div style="background: var(--bg-input); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--primary); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">

@@ -1,0 +1,3 @@
+<Files "banco.sqlite">
+    Require all denied
+</Files>
